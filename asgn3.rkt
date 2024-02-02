@@ -75,18 +75,18 @@
 
 
 ; interp-fns: Interprets the function named main
-(define (interp-fns [funs : (Listof FunDefC)]) : (Listof FunDefC)
+(define (interp-fns [funs : (Listof FunDefC)]) : Real
   (define main (find-main funs))
   (match main
     [ExprC (interp main funs)]))
 
 
 ; interp: Interpreter
-(define (interp [exp : ExprC] [funs : (Listof FunDefC)]) : (Listof FunDefC)
+(define (interp [exp : ExprC] [funs : (Listof FunDefC)]) : Real
   funs)
 
-(interp-fns (list (FunDefC 'a 'b (NumC 1)) (FunDefC 'main 'init (NumC 1))))
-(interp-fns (list (FunDefC 'a 'b (NumC 1)) (FunDefC 'main 'b (NumC 1))))
+;(interp-fns (list (FunDefC 'a 'b (NumC 1)) (FunDefC 'main 'init (NumC 1))))
+;(interp-fns (list (FunDefC 'a 'b (NumC 1)) (FunDefC 'main 'b (NumC 1))))
 ;(interp-fns (list (FunDefC 'a 'b (NumC 1)) (FunDefC 'yerr 'b (NumC 1))))
 
 ; top-interp: combines parsing and evaluation
