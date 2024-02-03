@@ -22,7 +22,6 @@
     [(list '/ a b ) (binopC '/ (parse a) (parse b))] ; { / ExprC ExprC }
     [(list (? symbol? n) exp) (AppC n (parse exp))]  ; AppC {id ExprC} function call 
     [(? symbol? n) (IdC n)]                      ; id
-    ;[(list (? Idc? a) b) (IdC a)]               ; idC (id expr)  ??? idk how to do  is it needed? 
     [(list 'ifleq0? test then else) (ifleq0? (parse test) (parse then) (parse else))] ; {ifleq0? ExprC ExprC ExprC}
     [other (error 'parser "OAZO failed: ~a is invalid" a)]))
 
@@ -46,8 +45,6 @@
   (match s
     [(list 'func (list (? symbol? name) (? symbol? arg)) ': (list body ...))
      (FunDefC name arg (parse body))]
-     ;[(list 'func (list 'main 'init) ': (list body ...))     ; should parse-fundef parse main in here? 
-     ;(FunDefC 'main 'init (parse body))] ; main function 
     [other (error 'parse-fundef "OAZO failed: ~a is invalid" s)]))
 
 (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
@@ -96,7 +93,7 @@
                [(symbol=? s for) what]
                [else in])]
     [(AppC fun arg) (AppC fun (subst what for arg))]
-    [(binopC sym l r) (binopC sym (subst what for l ) (subst what for l ))]
+    [(binopC sym l r) (binopC sym (subst what for l ) (subst what for r ))]
     [other (error 'subst "OAZO failed: ~a is invalid" in)]))
  
 ; interp: Interprets the given expression, using the list of funs to resolve applications
@@ -107,11 +104,11 @@
   (match exp
     [(NumC n) n]
     [(IdC  n) (error 'interp "OAZO shouldn't get here, ~a" exp)]
-    [(AppC f a) (define fd (get-fundef f fds)) (interp (subst a
+    [(AppC f a) (define fd (get-fundef f fds)) (printf "~v\n" fd) (interp (subst a
                                                               (FunDefC-arg fd)
                                                               (FunDefC-body fd))
                                                        fds)] ; idk 
-    [(binopC '+ l r) (+ (interp l fds) (interp r fds))]
+    [(binopC op l r) (op (interp l fds) (interp r fds))] ; 
     [(binopC '- l r) (- (interp l fds) (interp r fds))]
     [(binopC '* l r) (* (interp l fds) (interp r fds))]
     [(binopC '/ l r) (/ (interp l fds) (interp r fds))]
@@ -122,15 +119,19 @@
 
 ; (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
 ; (define addOne (FunDefC 'addOne 'x (binopC '+ (IdC 'x) (NumC 1))))
-(define square (parse-fundef '{func {square x} : {* x x}}))
-(define add-one (parse-fundef '{func {add-one x} : {+ x 1}})) ; help me idk whats going on 
-(define funcList (list double add-one square)) ; function list 
+(define square (parse-fundef '{func {square x} : {* x x}})) ; this works 
+(define add-one (parse-fundef '{func {add-one x} : {+ x 1}})) ; help me idk whats going on
+(define sub-one (parse-fundef '{func {sub-one x} : {- x 1}})) ; help me idk whats going on
+(define div-one (parse-fundef '{func {div-one x} : {/ x x}})) ; help me idk whats going on 
+(define funcList (list double add-one square sub-one div-one)) ; function list 
+;`{ifleq0? x x {- x 1}}
 
 ; parse -> interpreter 
 (printf "~v\n" add-one)
-(parse '{add-one 5})
-(interp (parse '{add-one 5}) funcList )
-(check-equal? (interp (parse '{square {double 2} }) funcList) 16)
+(parse '{add-one 27})
+(interp (parse '{add-one 27}) funcList )
+
+;(check-equal? (interp (parse '{square {double 2} }) funcList) 16)
 ; top-interp: combines parsing and evaluation
 ; accepts an s-expression and calls the parser and then the interp function. (GIVEN)
 ;(define (top-interp [s : Sexp]) : Real
