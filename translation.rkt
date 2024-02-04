@@ -1,7 +1,6 @@
 #lang typed/racket
 
 (require typed/rackunit)
-;(require/typed racket/mutability [immutable-hash? (Any -> Boolean)])
 
 ; ExprC Definition, from SECTION 5.1 Book
 (define-type ExprC (U NumC IdC AppC binopC ifleq0?))
@@ -56,6 +55,17 @@
      (regexp-quote "parse-fundef: OAZO failed: (ISA President) is invalid"))
      (lambda () (parse-fundef '{ISA President})))
 
+;(parse-prog '{{func {f x} : {+ x 14}}
+;              {func {main init} : {f 2}}})
+
+; parse-prog: Parses a program TODO
+;(define (parse-prog [s : Sexp]) : (Listof FundefC)
+;  (1))
+
+; interp-fns
+; Interprets the function named main from the function definitions.
+;(define (interp-fns [funs : (Listof FunDefC)] ) : Real (1))
+
 
 ; get-fundef: helper function to map/look up the name to the function definition
 ; n: the function name
@@ -85,12 +95,7 @@
     [(AppC fun arg) (AppC fun (subst what for arg))]
     [(binopC sym l r) (binopC sym (subst what for l ) (subst what for r ))]
     [other (error 'subst "OAZO failed: ~a is invalid" in)]))
-
-
-; hash table for operator names and meanings
-(define binopHash (hash '+ + '- - '* * '/ /))
-;(immutable-hash? binopHash)
-
+ 
 ; interp: Interprets the given expression, using the list of funs to resolve applications
 ; exp: expression given
 ; fds: list of defined functions
@@ -99,65 +104,35 @@
   (match exp
     [(NumC n) n]
     [(IdC  n) (error 'interp "OAZO shouldn't get here, ~a" exp)]
-    [(AppC f a) (define fd (get-fundef f fds)) (interp (subst a
+    [(AppC f a) (define fd (get-fundef f fds)) (printf "~v\n" fd) (interp (subst a
                                                               (FunDefC-arg fd)
                                                               (FunDefC-body fd))
                                                        fds)] ; idk 
-    [(binopC s l r) (cond
-                      [(hash-has-key? binopHash s)
-                       ((hash-ref binopHash s) (interp l fds) (interp r fds))]
-                      [else (error 'interp "OAZO failed: ~a is invalid" exp)])]
-    ;[(binopC '+ l r) (+ (interp l fds) (interp r fds))]
-    ;[(binopC '- l r) (- (interp l fds) (interp r fds))]
-    ;[(binopC '* l r) (* (interp l fds) (interp r fds))]
-    ;[(binopC '/ l r) (/ (interp l fds) (interp r fds))]
+    [(binopC op l r) (op (interp l fds) (interp r fds))] ; 
+    [(binopC '- l r) (- (interp l fds) (interp r fds))]
+    [(binopC '* l r) (* (interp l fds) (interp r fds))]
+    [(binopC '/ l r) (/ (interp l fds) (interp r fds))]
     [(ifleq0? test then else) (cond
                                 [(>= 0 (interp test fds)) (interp then fds)]
                                 [else (interp else fds)])]
     [other (error 'interp "OAZO failed: ~a is invalid" exp)]))
 
-;(interp (binopC '% (NumC 3) (NumC 3)) '()) ; test binopHash error
 ; (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
 ; (define addOne (FunDefC 'addOne 'x (binopC '+ (IdC 'x) (NumC 1))))
-(define square (parse-fundef '{func {square x} : {* x x}}))
-(define add-one (parse-fundef '{func {add-one x} : {+ x 1}})) ; help me idk whats going on 
-(define funcList (list double add-one square)) ; function list 
+(define square (parse-fundef '{func {square x} : {* x x}})) ; this works 
+(define add-one (parse-fundef '{func {add-one x} : {+ x 1}})) ; help me idk whats going on
+(define sub-one (parse-fundef '{func {sub-one x} : {- x 1}})) ; help me idk whats going on
+(define div-one (parse-fundef '{func {div-one x} : {/ x x}})) ; help me idk whats going on 
+(define funcList (list double add-one square sub-one div-one)) ; function list 
+;`{ifleq0? x x {- x 1}}
 
 ; parse -> interpreter 
 (printf "~v\n" add-one)
-(parse '{add-one 5})
-(interp (parse '{add-one 5}) funcList )
-(check-equal? (interp (parse '{square {double 2} }) funcList) 16)
+(parse '{add-one 27})
+(interp (parse '{add-one 27}) funcList )
 
-
-; find-main: Finds and return the main function
-(define (find-main [funs : (Listof FunDefC)]) : ExprC
-  (match funs
-    ['() (error 'find-main "OAZO failed: no main function found")]
-    [(cons (struct FunDefC (name arg body)) r)
-     (match name
-       ['main
-        (match arg
-          ['init body]
-          [else (error 'find-main "OAZO failed: ~a is an incorrect argument for main" arg)])]
-       [else (find-main r)])]))
-
-
-; interp-fns: Interprets the function named main
-(define (interp-fns [funs : (Listof FunDefC)]) : Real
-  (define main (find-main funs))
-  (match main
-    [ExprC (interp main funs)]))
-    
-
-;(parse-prog '{{func {f x} : {+ x 14}}
-;              {func {main init} : {f 2}}})
-
-; parse-prog: Parses a program TODO
-;(define (parse-prog [s : Sexp]) : (Listof FundefC)
-;  (1))
-
-
+;(check-equal? (interp (parse '{square {double 2} }) funcList) 16)
 ; top-interp: combines parsing and evaluation
 ; accepts an s-expression and calls the parser and then the interp function. (GIVEN)
 ;(define (top-interp [s : Sexp]) : Real
+;  (interp-fns (parse-prog s)))
