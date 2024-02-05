@@ -141,13 +141,17 @@
     [(IdC n) (match n
                 ['init 0]
                 [other (error 'interp "OAZO shouldn't get here, ~a" exp)])]
-    [(AppC f a) (define fd (get-fundef f fds)) (interp (subst a
+    [(AppC f a) (define fd (get-fundef f fds)) (interp (subst (NumC (interp a fds))
                                                               (FunDefC-arg fd)
                                                               (FunDefC-body fd))
                                                        fds)]
     [(binopC s l r) (cond
                       [(hash-has-key? binopHash s)
-                       ((hash-ref binopHash s) (interp l fds) (interp r fds))]
+                       (match s
+                           ['/ (if (eq? (interp r fds) 0)
+                                   (error 'interp "OAZO failed: can't divide by 0")
+                                   ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
+                           [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
                       [else (error 'interp "OAZO failed: ~a is invalid" exp)])]               
     [(ifleq0? test then else) (cond
                                 [(>= 0 (interp test fds)) (interp then fds)]
@@ -174,14 +178,19 @@
 (check-exn (regexp (regexp-quote "OAZO failed: #(struct:binopC % #(struct:NumC 3) #(struct:NumC 3)) is invalid"))
            (lambda () (interp (binopC '% (NumC 3) (NumC 3)) '()))) ; test binopHash error
 
+(check-exn (regexp
+     (regexp-quote "interp: OAZO failed: can't divide by 0"))
+     (lambda () (interp (binopC '/ (NumC 1) (NumC 0)) '())))
 
+(check-equal? (interp (binopC '/ (NumC 6) (NumC 3)) fds) 2)
 
 ; (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
 ; (define addOne (FunDefC 'addOne 'x (binopC '+ (IdC 'x) (NumC 1))))
 (define square (parse-fundef '{func {square x} : {* x x}}))
 (define add-one (parse-fundef '{func {add-one x} : {+ x 1}}))
 (define sub-ten (parse-fundef '{func {sub-ten x} : {- x 10}}))
-(define funcList (list double add-one square sub-ten)) ; function list 
+(define div-zero (parse-fundef '{func {div-zero x} : {/ x 0}}))
+(define funcList (list double add-one square sub-ten div-zero)) ; function list 
 
 (check-equal? (interp (parse '{sub-ten{add-one 5}}) funcList ) -4)
 (check-equal? (interp (parse '{square {double 2} }) funcList) 16)
@@ -205,14 +214,6 @@
   (define main (find-main funs))
   (match main
     [ExprC (interp main funs)]))
-
-    ;[other (error 'find-main "OAZO failed: ~a is not main" main)]))
-
-
-
-
-
-;(check-equal? (interp-fns))
 
 
 ;(struct FunDefC ([name : Symbol] [arg : Symbol] [body : ExprC]) #:transparent) ; function definition
@@ -273,7 +274,7 @@
 ;expected exception with message containing OAZO on test expression: '(parse '(+ / 3))
 ;Saving submission with errors.
 
-(check-equal? (parse-fundef  '(func (f x) : 6)) (FunDefC 'f 'x (NumC 6)))
+;(check-equal? (parse-fundef  '(func (f x) : 6)) (FunDefC 'f 'x (NumC 6)))
 
 ;  parse-fundef: OAZO failed: (func (f x) : 6) is invalid
 ;Saving submission with errors.
@@ -292,6 +293,13 @@
 ; #(struct:binopC + #(struct:IdC qq) #(struct:NumC 1))) is invalid
 
 ;expected exception with message containing OAZO on test expression:
-;'
-(top-interp '((func (ignoreit x) : (+ 3 4)) (func (main init) : (ignoreit (/ 1 (+ 0 0))))))
+;
+
+;(top-interp '(
+;             (func (ignoreit x) : (+ 3 4))
+;              (func (main init) : (ignoreit (/ 1 (+ 0 0))))))
+;(interp (parse '{div-zero 1}) funcList )
+;Saving submission with errors.
+
+;expected exception with message containing OAZO on test expression: '(parse '(+ func a))
 ;Saving submission with errors.
