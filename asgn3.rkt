@@ -21,7 +21,9 @@
     [(list '- a b ) (binopC '- (parse a) (parse b))] ; { - ExprC ExprC } 
     [(list '* a b ) (binopC '* (parse a) (parse b))] ; { * ExprC ExprC } 
     [(list '/ a b ) (binopC '/ (parse a) (parse b))] ; { / ExprC ExprC }
-    [(list (? symbol? n) exp) (AppC n (parse exp))]  ; AppC {id ExprC} function call 
+    [(list (? symbol? n) exp) (cond
+                              [(hash-has-key? binopHash n) (error 'parser "OAZO failed: ~a is invalid IdC" s)]
+                              [else (AppC n (parse exp))])]  ; AppC {id ExprC} function call 
     [(? symbol? n) (cond 
                      [(or (equal? n '+) (equal? n '-) (equal? n '/) (equal? n '*) (equal? n 'ifleq0?)
                           (equal? n 'func))
@@ -306,4 +308,7 @@
 ;Saving submission with errors.
 
 ;expected exception with message containing OAZO on test expression: '(parse '(+ b))
+(check-exn (regexp
+     (regexp-quote "parser: OAZO failed: (+ b) is invalid IdC"))
+     (lambda () (parse '(+ b))))
 
