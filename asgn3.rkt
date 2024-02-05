@@ -71,6 +71,7 @@
        [else (get-fundef n (rest fds))])]))
 
 
+
 ; subst: Replaces the name with another expression
 ; what: what we want to replace the name with
 ; for: what name we want to perform substitution
@@ -144,7 +145,8 @@
   (match main
     [ExprC (interp main funs)]
     [other (error 'find-main "OAZO failed: ~a is not main" main)]))
-    
+
+;(check-equal? (interp-fns))
 
 ;(struct FunDefC ([name : Symbol] [arg : Symbol] [body : ExprC]) #:transparent) ; function definition
 ;(define (parse-fundef [s : Sexp] ) : FunDefC
@@ -155,11 +157,38 @@
     [(cons f r) (cons (parse-fundef f) (parse-prog r))]
     [other (error 'parse-prog "OAZO failed: ~a is an invalid program" s)]))
 
-(parse-prog '{{func {f x} : {+ x 14}}
-              {func {main init} : {f 2}}})
+(check-exn (regexp
+     (regexp-quote "parse-prog: OAZO failed: 1 is an invalid program"))
+     (lambda () (parse-prog 1)))
+
+(check-equal? (parse-prog '{{func {f x} : {+ x 14}}
+              {func {main init} : {f 2}}}) (list (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14)))
+                                                 (FunDefC 'main 'init (AppC 'f (NumC 2)))))
 
 ; top-interp: combines parsing and evaluation
 ; accepts an s-expression and calls the parser and then the interp function. (GIVEN)
 (: top-interp (Sexp -> Real))
 (define (top-interp fun-sexps)
   (interp-fns (parse-prog fun-sexps)))
+
+(check-equal? (top-interp '{{func {f x} : {+ x 14}}
+                           {func {main init} : {f 2}}}) 16)
+
+(check-equal? (top-interp '{{func {double x} : {+ x x}}
+                           {func {main init} : {double {double 2}}}}) 8)
+
+(check-exn (regexp
+     (regexp-quote "get-fundef: OAZO reference to undefined function, amongus"))
+     (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
+                           {func {main init} : {amongus {amongus 2}}}})))
+
+(check-exn (regexp
+     (regexp-quote "find-main: OAZO failed: sus is an incorrect argument for main"))
+     (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
+                           {func {main sus} : {amongus {amongus 2}}}})))
+
+(check-exn (regexp
+     (regexp-quote "find-main: OAZO failed: no main function found"))
+     (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
+                           {func {baka sus} : {amongus {amongus 2}}}})))
+
