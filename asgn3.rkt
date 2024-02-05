@@ -75,7 +75,8 @@
 ; what: what we want to replace the name with
 ; for: what name we want to perform substitution
 ; in: expression we want to do it in
-; returns the expression that is substituted with 
+; returns the expression that is substituted with
+
 (define (subst [what : ExprC] [for : Symbol ] [in : ExprC] ) : ExprC
   (match in
     [(NumC n ) in ]
@@ -102,15 +103,11 @@
     [(AppC f a) (define fd (get-fundef f fds)) (interp (subst a
                                                               (FunDefC-arg fd)
                                                               (FunDefC-body fd))
-                                                       fds)] ; idk 
+                                                       fds)]
     [(binopC s l r) (cond
                       [(hash-has-key? binopHash s)
                        ((hash-ref binopHash s) (interp l fds) (interp r fds))]
                       [else (error 'interp "OAZO failed: ~a is invalid" exp)])]
-    ;[(binopC '+ l r) (+ (interp l fds) (interp r fds))]
-    ;[(binopC '- l r) (- (interp l fds) (interp r fds))]
-    ;[(binopC '* l r) (* (interp l fds) (interp r fds))]
-    ;[(binopC '/ l r) (/ (interp l fds) (interp r fds))]
     [(ifleq0? test then else) (cond
                                 [(>= 0 (interp test fds)) (interp then fds)]
                                 [else (interp else fds)])]
@@ -120,13 +117,11 @@
 ; (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
 ; (define addOne (FunDefC 'addOne 'x (binopC '+ (IdC 'x) (NumC 1))))
 (define square (parse-fundef '{func {square x} : {* x x}}))
-(define add-one (parse-fundef '{func {add-one x} : {+ x 1}})) ; help me idk whats going on 
-(define funcList (list double add-one square)) ; function list 
+(define add-one (parse-fundef '{func {add-one x} : {+ x 1}}))
+(define sub-ten (parse-fundef '{func {sub-ten x} : {- x 10}}))
+(define funcList (list double add-one square sub-ten)) ; function list 
 
-; parse -> interpreter 
-(printf "~v\n" add-one)
-(parse '{add-one 5})
-(interp (parse '{add-one 5}) funcList )
+(check-equal? (interp (parse '{sub-ten{add-one 5}}) funcList ) -4)
 (check-equal? (interp (parse '{square {double 2} }) funcList) 16)
 
 
@@ -147,17 +142,24 @@
 (define (interp-fns [funs : (Listof FunDefC)]) : Real
   (define main (find-main funs))
   (match main
-    [ExprC (interp main funs)]))
+    [ExprC (interp main funs)]
+    [other (error 'find-main "OAZO failed: ~a is not main" main)]))
     
 
-;(parse-prog '{{func {f x} : {+ x 14}}
-;              {func {main init} : {f 2}}})
-
+;(struct FunDefC ([name : Symbol] [arg : Symbol] [body : ExprC]) #:transparent) ; function definition
+;(define (parse-fundef [s : Sexp] ) : FunDefC
 ; parse-prog: Parses a program TODO
-;(define (parse-prog [s : Sexp]) : (Listof FundefC)
-;  (1))
+(define (parse-prog [s : Sexp]) : (Listof FunDefC)
+  (match s
+    ['() '()]
+    [(cons f r) (cons (parse-fundef f) (parse-prog r))]
+    [other (error 'parse-prog "OAZO failed: ~a is an invalid program" s)]))
 
+(parse-prog '{{func {f x} : {+ x 14}}
+              {func {main init} : {f 2}}})
 
 ; top-interp: combines parsing and evaluation
 ; accepts an s-expression and calls the parser and then the interp function. (GIVEN)
-;(define (top-interp [s : Sexp]) : Real
+(: top-interp (Sexp -> Real))
+(define (top-interp fun-sexps)
+  (interp-fns (parse-prog fun-sexps)))
