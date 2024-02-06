@@ -1,5 +1,7 @@
 #lang typed/racket
 
+; Finished Asgn3, all test cases passed.
+
 (require typed/rackunit)
 ;(require/typed racket/mutability [immutable-hash? (Any -> Boolean)])
 
