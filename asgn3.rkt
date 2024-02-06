@@ -22,27 +22,15 @@
     [(list '* a b ) (binopC '* (parse a) (parse b))] ; { * ExprC ExprC } 
     [(list '/ a b ) (binopC '/ (parse a) (parse b))] ; { / ExprC ExprC }
     [(list (? symbol? n) exp) (cond
-                              [(hash-has-key? binopHash n) (error 'parse "OAZO failed: ~a is invalid IdC" s)]
-                              [else (AppC n (parse exp))])]  ; AppC {id ExprC} function call 
+                                [(hash-has-key? binopHash n) (error 'parser "OAZO failed: ~a is invalid IdC" s)]
+                                [else (AppC n (parse exp))])]  ; AppC {id ExprC} function call 
     [(? symbol? n) (cond 
                      [(or (equal? n '+) (equal? n '-) (equal? n '/) (equal? n '*) (equal? n 'ifleq0?)
                           (equal? n 'func))
-                      (error 'parse "OAZO failed: ~a is invalid IdC" s)]
+                      (error 'parser "OAZO failed: ~a is invalid IdC" s)]
                      [else (IdC n)])]                 ; id
     [(list 'ifleq0? test then else) (ifleq0? (parse test) (parse then) (parse else))] ; {ifleq0? ExprC ExprC ExprC}
-    [other (error 'parse "OAZO failed: ~a is invalid" s)]))
-
-
-(check-equal? (parse '{- {+ 4 2 } 3}) (binopC '- (binopC '+ (NumC 4) (NumC 2)) (NumC 3)))
-(check-equal? (parse '{/ {* 4 2 } 3}) (binopC '/ (binopC '* (NumC 4) (NumC 2)) (NumC 3)))
-(check-equal? (parse 'fasd) (IdC 'fasd))
-(check-equal? (parse '{ifleq0? 5 4 2}) (ifleq0? (NumC 5) (NumC 4) (NumC 2)))
-(check-exn (regexp
-     (regexp-quote "parse: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
-     (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
-(check-exn (regexp
-     (regexp-quote "parse: OAZO failed: / is invalid IdC"))
-     (lambda () (parse '(+ / 3)))) 
+    [other (error 'parser "OAZO failed: ~a is invalid" s)]))
 
 
 ; Function definition (GIVEN)
@@ -68,18 +56,7 @@
 
 (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
 
-(check-equal? (parse-fundef '{func {double x} : {+ x x}}) double)
-(check-equal? (parse-fundef '{func {f x} : {+ x 14}}) (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14))))
-(check-exn (regexp
-     (regexp-quote "parse-fundef: OAZO failed: (ISA President) is invalid"))
-     (lambda () (parse-fundef '{ISA President})))
-(check-exn (regexp
-     (regexp-quote "parse-fundef: OAZO failed: Function name cannot be one of +, -, /, *"))
-     (lambda () (parse-fundef '(func (+ x) : 13))))
 
-(check-exn (regexp
-     (regexp-quote "parse-fundef: OAZO failed: Function argument cannot be one of +, -, /, *"))
-     (lambda () (parse-fundef '(func (X +) : 13))))
 
 ; get-fundef: helper function to map/look up the name to the function definition
 ; n: the function name
@@ -113,20 +90,7 @@
     [(binopC sym l r) (binopC sym (subst what for l ) (subst what for r ))]
     [(ifleq0? test then else)
      (ifleq0? (subst what for test) (subst what for then) (subst what for else))]))
-    ;[other (error 'subst "OAZO failed: ~a is invalid" in)]))
 
-(check-equal? (subst (NumC 1) 'x (IdC 'y)) (IdC 'y))
-
-(check-exn (regexp
-     (regexp-quote "parse: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
-     (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
-
-; Test substitution in a complex expression involving function application and binary operations
-(check-equal? 
-  (subst (NumC 5) 'x ; Substitute 'x with 5
-         (binopC '+ (AppC 'double (binopC '* (IdC 'x) (NumC 2))) (NumC 3))) ; Original expression
-  (binopC '+ (AppC 'double (binopC '* (NumC 5) (NumC 2))) (NumC 3)) ; Expected result after substitution
-  "Test case for substitution within nested function application and binopC failed.")
 
 
 
@@ -142,8 +106,8 @@
   (match exp
     [(NumC n) n]
     [(IdC n) (match n
-                ['init 0]
-                [other (error 'interp "OAZO shouldn't get here, ~a" exp)])]
+               ['init 0]
+               [other (error 'interp "OAZO shouldn't get here, ~a" exp)])]
     [(AppC f a) (define fd (get-fundef f fds)) (interp (subst (NumC (interp a fds))
                                                               (FunDefC-arg fd)
                                                               (FunDefC-body fd))
@@ -151,52 +115,21 @@
     [(binopC s l r) (cond
                       [(hash-has-key? binopHash s)
                        (match s
-                           ['/ (if (eq? (interp r fds) 0)
-                                   (error 'interp "OAZO failed: can't divide by 0")
-                                   ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
-                           [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
+                         ['/ (if (eq? (interp r fds) 0)
+                                 (error 'interp "OAZO failed: can't divide by 0")
+                                 ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
+                         [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
                       [else (error 'interp "OAZO failed: ~a is invalid" exp)])]               
     [(ifleq0? test then else) (cond
                                 [(>= 0 (interp test fds)) (interp then fds)]
                                 [else (interp else fds)])]))
-    ;[other (error 'interp "OAZO failed: ~a is invalid" exp)]))
 
 
-(check-equal? (interp (NumC 42) '()) 42 "Interpreting NumC failed.")
-
-(check-exn (regexp (regexp-quote "OAZO shouldn't get here"))(lambda () (interp (IdC 'x) '())))
-
-(define fds (list (FunDefC 'add-one 'x (binopC '+ (IdC 'x) (NumC 1)))))
-
-(check-equal? (interp (AppC 'add-one (NumC 9)) fds)10 "Interpreting AppC 'add-one failed.")
-
-(check-equal? (interp (AppC 'add-one (NumC 9)) fds) 10 "Interpreting AppC failed.")
-
-(check-equal? (interp (binopC '+ (NumC 2) (NumC 3)) '()) 5 "Interpreting binopC failed.")
-
-(check-equal? (interp (ifleq0? (NumC -1) (NumC 10) (NumC 20)) '()) 10 "Interpreting ifleq0? (true branch) failed.")
-
-(check-equal? (interp (ifleq0? (NumC 1) (NumC 10) (NumC 20)) '()) 20 "Interpreting ifleq0? (false branch) failed.")
-
-(check-exn (regexp (regexp-quote "OAZO failed: #(struct:binopC % #(struct:NumC 3) #(struct:NumC 3)) is invalid"))
-           (lambda () (interp (binopC '% (NumC 3) (NumC 3)) '()))) ; test binopHash error
-
-(check-exn (regexp
-     (regexp-quote "interp: OAZO failed: can't divide by 0"))
-     (lambda () (interp (binopC '/ (NumC 1) (NumC 0)) '())))
-
-(check-equal? (interp (binopC '/ (NumC 6) (NumC 3)) fds) 2)
-
-; (define double (FunDefC 'double 'x (binopC '+ (IdC 'x) (IdC 'x))))
-; (define addOne (FunDefC 'addOne 'x (binopC '+ (IdC 'x) (NumC 1))))
 (define square (parse-fundef '{func {square x} : {* x x}}))
 (define add-one (parse-fundef '{func {add-one x} : {+ x 1}}))
 (define sub-ten (parse-fundef '{func {sub-ten x} : {- x 10}}))
 (define div-zero (parse-fundef '{func {div-zero x} : {/ x 0}}))
 (define funcList (list double add-one square sub-ten div-zero)) ; function list 
-
-(check-equal? (interp (parse '{sub-ten{add-one 5}}) funcList ) -4)
-(check-equal? (interp (parse '{square {double 2} }) funcList) 16)
 
 
 ; find-main: Finds and return the main function
@@ -228,87 +161,121 @@
     [(cons f r) (cons (parse-fundef f) (parse-prog r))]
     [other (error 'parse-prog "OAZO failed: ~a is an invalid program" s)]))
 
-(check-exn (regexp
-     (regexp-quote "parse-prog: OAZO failed: 1 is an invalid program"))
-     (lambda () (parse-prog 1)))
-
-(check-equal? (parse-prog '{{func {f x} : {+ x 14}}
-              {func {main init} : {f 2}}}) (list (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14)))
-                                                 (FunDefC 'main 'init (AppC 'f (NumC 2)))))
-
 ; top-interp: combines parsing and evaluation
 ; accepts an s-expression and calls the parser and then the interp function. (GIVEN)
 (: top-interp (Sexp -> Real))
 (define (top-interp fun-sexps)
   (interp-fns (parse-prog fun-sexps)))
 
+
+;test cases:
+
 (check-equal? (top-interp '{{func {f x} : {+ x 14}}
-                           {func {main init} : {f 2}}}) 16)
+                            {func {main init} : {f 2}}}) 16)
 
 (check-equal? (top-interp '{{func {double x} : {+ x x}}
-                           {func {main init} : {double {double 2}}}}) 8)
+                            {func {main init} : {double {double 2}}}}) 8)
 
 (check-exn (regexp
-     (regexp-quote "get-fundef: OAZO reference to undefined function, amongus"))
-     (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
-                           {func {main init} : {amongus {amongus 2}}}})))
+            (regexp-quote "get-fundef: OAZO reference to undefined function, amongus"))
+           (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
+                                    {func {main init} : {amongus {amongus 2}}}})))
 
 (check-exn (regexp
-     (regexp-quote "find-main: OAZO failed: sus is an incorrect argument for main"))
-     (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
-                           {func {main sus} : {amongus {amongus 2}}}})))
+            (regexp-quote "find-main: OAZO failed: sus is an incorrect argument for main"))
+           (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
+                                    {func {main sus} : {amongus {amongus 2}}}})))
 
 (check-exn (regexp
-     (regexp-quote "find-main: OAZO failed: no main function found"))
-     (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
-                           {func {baka sus} : {amongus {amongus 2}}}})))
-
-
-;error test cases:
+            (regexp-quote "find-main: OAZO failed: no main function found"))
+           (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
+                                    {func {baka sus} : {amongus {amongus 2}}}})))
 
 (top-interp '(
               (func (minus-five k) :
                     (+ k (* -1 5)))
               (func (main init) :
                     (minus-five (+ 8 init)))))
-;interp: OAZO shouldn't get here, #(struct:IdC init)
 
-;(parse '(+ / 3))
-;expected exception with message containing OAZO on test expression: '(parse '(+ / 3))
-;Saving submission with errors.
-
-;(check-equal? (parse-fundef  '(func (f x) : 6)) (FunDefC 'f 'x (NumC 6)))
-
-;  parse-fundef: OAZO failed: (func (f x) : 6) is invalid
-;Saving submission with errors.
-
-;expected exception with message containing OAZO on test expression: '(parse-fundef '(func (+ x) : 13))
-;Saving submission with errors.
-
-
-; expected exception with message containing OAZO on test expression: '(parse-fundef '(func (X +) : 13))
-
-;expected exception with message containing OAZO on test expression: '(parse 'ifleq0?)
-;(parse 'ifleq0?)
 
 (top-interp ' ((func (main init) : (+ (f 13) (f 0))) (func (f qq) : (ifleq0? qq qq (+ qq 1)))))
-; subst: OAZO failed: #(struct:ifleq0? #(struct:IdC qq) #(struct:IdC qq)
-; #(struct:binopC + #(struct:IdC qq) #(struct:NumC 1))) is invalid
 
-;expected exception with message containing OAZO on test expression:
-;
-
-;(top-interp '(
-;             (func (ignoreit x) : (+ 3 4))
-;              (func (main init) : (ignoreit (/ 1 (+ 0 0))))))
-;(interp (parse '{div-zero 1}) funcList )
-;Saving submission with errors.
-
-;expected exception with message containing OAZO on test expression: '(parse '(+ func a))
-;Saving submission with errors.
-
-;expected exception with message containing OAZO on test expression: '(parse '(+ b))
 (check-exn (regexp
-     (regexp-quote "parse: OAZO failed: (+ b) is invalid IdC"))
-     (lambda () (parse '(+ b))))
+            (regexp-quote "parser: OAZO failed: (+ b) is invalid IdC"))
+           (lambda () (parse '(+ b))))
 
+(check-exn (regexp
+            (regexp-quote "parse-prog: OAZO failed: 1 is an invalid program"))
+           (lambda () (parse-prog 1)))
+
+(check-equal? (parse-prog '{{func {f x} : {+ x 14}}
+                            {func {main init} : {f 2}}}) (list (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14)))
+                                                               (FunDefC 'main 'init (AppC 'f (NumC 2)))))
+
+(check-equal? (interp (parse '{sub-ten{add-one 5}}) funcList ) -4)
+(check-equal? (interp (parse '{square {double 2} }) funcList) 16)
+
+
+
+(check-equal? (interp (NumC 42) '()) 42 "Interpreting NumC failed.")
+
+(check-exn (regexp (regexp-quote "OAZO shouldn't get here"))(lambda () (interp (IdC 'x) '())))
+
+(define fds (list (FunDefC 'add-one 'x (binopC '+ (IdC 'x) (NumC 1)))))
+
+(check-equal? (interp (AppC 'add-one (NumC 9)) fds)10 "Interpreting AppC 'add-one failed.")
+
+(check-equal? (interp (AppC 'add-one (NumC 9)) fds) 10 "Interpreting AppC failed.")
+
+(check-equal? (interp (binopC '+ (NumC 2) (NumC 3)) '()) 5 "Interpreting binopC failed.")
+
+(check-equal? (interp (ifleq0? (NumC -1) (NumC 10) (NumC 20)) '()) 10 "Interpreting ifleq0? (true branch) failed.")
+
+(check-equal? (interp (ifleq0? (NumC 1) (NumC 10) (NumC 20)) '()) 20 "Interpreting ifleq0? (false branch) failed.")
+
+(check-exn (regexp (regexp-quote "OAZO failed: #(struct:binopC % #(struct:NumC 3) #(struct:NumC 3)) is invalid"))
+           (lambda () (interp (binopC '% (NumC 3) (NumC 3)) '()))) ; test binopHash error
+
+(check-exn (regexp
+            (regexp-quote "interp: OAZO failed: can't divide by 0"))
+           (lambda () (interp (binopC '/ (NumC 1) (NumC 0)) '())))
+
+(check-equal? (interp (binopC '/ (NumC 6) (NumC 3)) fds) 2)
+
+(check-equal? (parse-fundef '{func {double x} : {+ x x}}) double)
+(check-equal? (parse-fundef '{func {f x} : {+ x 14}}) (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14))))
+(check-exn (regexp
+            (regexp-quote "parse-fundef: OAZO failed: (ISA President) is invalid"))
+           (lambda () (parse-fundef '{ISA President})))
+(check-exn (regexp
+            (regexp-quote "parse-fundef: OAZO failed: Function name cannot be one of +, -, /, *"))
+           (lambda () (parse-fundef '(func (+ x) : 13))))
+
+(check-exn (regexp
+            (regexp-quote "parse-fundef: OAZO failed: Function argument cannot be one of +, -, /, *"))
+           (lambda () (parse-fundef '(func (X +) : 13))))
+
+
+(check-equal? (parse '{- {+ 4 2 } 3}) (binopC '- (binopC '+ (NumC 4) (NumC 2)) (NumC 3)))
+(check-equal? (parse '{/ {* 4 2 } 3}) (binopC '/ (binopC '* (NumC 4) (NumC 2)) (NumC 3)))
+(check-equal? (parse 'fasd) (IdC 'fasd))
+(check-equal? (parse '{ifleq0? 5 4 2}) (ifleq0? (NumC 5) (NumC 4) (NumC 2)))
+(check-exn (regexp
+            (regexp-quote "parser: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
+           (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
+(check-exn (regexp
+            (regexp-quote "parser: OAZO failed: / is invalid IdC"))
+           (lambda () (parse '(+ / 3)))) 
+
+(check-equal? (subst (NumC 1) 'x (IdC 'y)) (IdC 'y))
+
+(check-exn (regexp
+            (regexp-quote "parser: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
+           (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
+
+; Test substitution in a complex expression involving function application and binary operations
+(check-equal? 
+ (subst (NumC 5) 'x ; Substitute 'x with 5
+        (binopC '+ (AppC 'double (binopC '* (IdC 'x) (NumC 2))) (NumC 3))) ; Original expression
+ (binopC '+ (AppC 'double (binopC '* (NumC 5) (NumC 2))) (NumC 3)) ; Expected result after substitution
+ "Test case for substitution within nested function application and binopC failed.")
