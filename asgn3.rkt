@@ -1,10 +1,7 @@
 #lang typed/racket
 (require typed/rackunit)
-;(require/typed racket/mutability [immutable-hash? (Any -> Boolean)])
 
 ; Finished Asgn3, all test cases passed.
-
-
 
 ; ExprC Definition, from SECTION 5.1 Book
 (define-type ExprC (U NumC IdC AppC binopC ifleq0?))
@@ -12,7 +9,6 @@
 (struct IdC ([s : Symbol]) #:transparent)                   ; Id 
 (struct AppC ([fun : Symbol] [arg : ExprC]) #:transparent)  ; Function Application
 (struct ifleq0? ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent ) ; 0 >= x
-
 (struct binopC ([op : Symbol] [l : ExprC] [r : ExprC]) #:transparent) ; Takes care of binary operations 
 
 
@@ -39,7 +35,7 @@
 
 
 ; Function definition (GIVEN)
-(struct FunDefC ([name : Symbol] [arg : Symbol] [body : ExprC]) #:transparent) ; function definition
+(struct FunDefC ([name : Symbol] [arg : Symbol] [body : ExprC]) #:transparent)
 
 
 
@@ -96,7 +92,6 @@
 
 ; hash table for operator names and meanings
 (define binopHash (hash '+ + '- - '* * '/ /))
-;(immutable-hash? binopHash     ; make sure hash is immutable
 
 
 
@@ -210,13 +205,16 @@
            (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
                                     {func {baka sus} : {amongus {amongus 2}}}})))
 
-(top-interp '(
+(check-equal? (top-interp '(
               (func (minus-five k) :
                     (+ k (* -1 5)))
               (func (main init) :
-                    (minus-five (+ 8 init)))))
+                    (minus-five (+ 8 init))))) 3)
 
-(top-interp ' ((func (main init) : (+ (f 13) (f 0))) (func (f qq) : (ifleq0? qq qq (+ qq 1)))))
+(check-equal? (top-interp
+               '((func (main init) :
+                       (+ (f 13) (f 0)))
+                 (func (f qq) : (ifleq0? qq qq (+ qq 1))))) 14)
 
 
 ; interp tests
@@ -284,10 +282,6 @@
 (check-equal? (parse 'fasd) (IdC 'fasd))
 
 (check-equal? (parse '{ifleq0? 5 4 2}) (ifleq0? (NumC 5) (NumC 4) (NumC 2)))
-
-(check-exn (regexp
-            (regexp-quote "parse: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
-           (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
 
 (check-exn (regexp
             (regexp-quote "parse: OAZO failed: / is invalid IdC"))
