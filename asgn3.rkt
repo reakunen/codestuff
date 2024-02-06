@@ -22,15 +22,15 @@
     [(list '* a b ) (binopC '* (parse a) (parse b))] ; { * ExprC ExprC } 
     [(list '/ a b ) (binopC '/ (parse a) (parse b))] ; { / ExprC ExprC }
     [(list (? symbol? n) exp) (cond
-                              [(hash-has-key? binopHash n) (error 'parser "OAZO failed: ~a is invalid IdC" s)]
+                              [(hash-has-key? binopHash n) (error 'parse "OAZO failed: ~a is invalid IdC" s)]
                               [else (AppC n (parse exp))])]  ; AppC {id ExprC} function call 
     [(? symbol? n) (cond 
                      [(or (equal? n '+) (equal? n '-) (equal? n '/) (equal? n '*) (equal? n 'ifleq0?)
                           (equal? n 'func))
-                      (error 'parser "OAZO failed: ~a is invalid IdC" s)]
+                      (error 'parse "OAZO failed: ~a is invalid IdC" s)]
                      [else (IdC n)])]                 ; id
     [(list 'ifleq0? test then else) (ifleq0? (parse test) (parse then) (parse else))] ; {ifleq0? ExprC ExprC ExprC}
-    [other (error 'parser "OAZO failed: ~a is invalid" s)]))
+    [other (error 'parse "OAZO failed: ~a is invalid" s)]))
 
 
 (check-equal? (parse '{- {+ 4 2 } 3}) (binopC '- (binopC '+ (NumC 4) (NumC 2)) (NumC 3)))
@@ -38,10 +38,10 @@
 (check-equal? (parse 'fasd) (IdC 'fasd))
 (check-equal? (parse '{ifleq0? 5 4 2}) (ifleq0? (NumC 5) (NumC 4) (NumC 2)))
 (check-exn (regexp
-     (regexp-quote "parser: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
+     (regexp-quote "parse: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
      (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
 (check-exn (regexp
-     (regexp-quote "parser: OAZO failed: / is invalid IdC"))
+     (regexp-quote "parse: OAZO failed: / is invalid IdC"))
      (lambda () (parse '(+ / 3)))) 
 
 
@@ -118,7 +118,7 @@
 (check-equal? (subst (NumC 1) 'x (IdC 'y)) (IdC 'y))
 
 (check-exn (regexp
-     (regexp-quote "parser: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
+     (regexp-quote "parse: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
      (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
 
 ; Test substitution in a complex expression involving function application and binary operations
@@ -309,6 +309,6 @@
 
 ;expected exception with message containing OAZO on test expression: '(parse '(+ b))
 (check-exn (regexp
-     (regexp-quote "parser: OAZO failed: (+ b) is invalid IdC"))
+     (regexp-quote "parse: OAZO failed: (+ b) is invalid IdC"))
      (lambda () (parse '(+ b))))
 
