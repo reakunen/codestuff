@@ -183,7 +183,7 @@
 (define fds (list (FunDefC 'add-one 'x (binopC '+ (IdC 'x) (NumC 1)))))
 
 
-; top-interp tests
+; top-interp
 (check-equal? (top-interp '{{func {f x} : {+ x 14}}
                             {func {main init} : {f 2}}}) 16)
 
@@ -215,6 +215,23 @@
                '((func (main init) :
                        (+ (f 13) (f 0)))
                  (func (f qq) : (ifleq0? qq qq (+ qq 1))))) 14)
+                
+; interp-fns tests
+
+(define interp-test1 (parse-prog '{{func {f x} : {+ x 14}}
+                            {func {main init} : {f 2}}}))
+
+(define interp-test2 (parse-prog '{{func {f x} : {+ x x}}
+                            {func {main init} : {f 2}}}))
+
+(define interp-test3 (parse-prog '{{func {f x} : {+ {* x 14} 2}}
+    {func {main init} : {f 2}}})) 
+
+
+(check-equal? (interp-fns interp-test1) 16)
+(check-equal? (interp-fns interp-test2) 4)
+(check-equal? (interp-fns interp-test3) 30)
+
 
 
 ; interp tests
