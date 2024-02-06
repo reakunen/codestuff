@@ -26,12 +26,11 @@
     [(list (? symbol? n) exp) (cond
                                 [(hash-has-key? binopHash n) (error 'parser "OAZO failed: ~a is invalid IdC" s)]
                                 [else (AppC n (parse exp))])]  ; AppC {id ExprC} function call 
-    [(? symbol? n) (cond 
-                     [(or (equal? n '+) (equal? n '-) (equal? n '/) (equal? n '*) (equal? n 'ifleq0?)
-                          (equal? n 'func))
+    [(? symbol? n) (match n  
+                     [(or '+ '- '/ '* 'ifleq0? 'func)
                       (error 'parser "OAZO failed: ~a is invalid IdC" s)]
-                     [else (IdC n)])]                 ; id
-    [(list 'ifleq0? test then else) (ifleq0? (parse test) (parse then) (parse else))] ; {ifleq0? ExprC ExprC ExprC}
+                     [other (IdC n)])]                 ; id
+    [(list 'ifleq0? test then else) (ifleq0? (parse test) (parse then) (parse else))] 
     [other (error 'parser "OAZO failed: ~a is invalid" s)]))
 
 
@@ -262,6 +261,7 @@
 (check-equal? (parse '{/ {* 4 2 } 3}) (binopC '/ (binopC '* (NumC 4) (NumC 2)) (NumC 3)))
 (check-equal? (parse 'fasd) (IdC 'fasd))
 (check-equal? (parse '{ifleq0? 5 4 2}) (ifleq0? (NumC 5) (NumC 4) (NumC 2)))
+
 (check-exn (regexp
             (regexp-quote "parser: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
            (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
