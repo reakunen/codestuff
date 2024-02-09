@@ -111,12 +111,65 @@
 ; for: what name we want to perform substitution
 ; in: expression we want to do it in
 ; returns the expression that is substituted with
+; (AppC 'functioncall (list (IdC 'x) (NumC 7) (NumC 3082) (IdC 'cb)))
+; (parse '{functioncall x 7 3082 cb}) ; can parse functions with multiple args
+; (FunDefC 'f '() (binopC '+ (NumC 2) (NumC 2)))
+; cons
+
+; name of function and the arguments
+;(define interpFunc [] ) : (Listof ExprC)
+
+; takes a list of arguments, that intepred
+(define (substHelper [for : (Listof Symbol)] [args : (Listof ExprC)] [body : ExprC]) : ExprC
+  (match (list for args)
+    [(list '() '()) body]
+    [(list '() e) (error 'interp "Not enough arguments" )]
+    [(list e '()) (error 'interp "Too many arguments" )]
+    [(list (cons f1 r1) (cons f2 r2)) (substHelper r1 r2 (subst f2 f1 body))]))
+
+  ;run subst multiple times 
+; what are we substituting?
+; go through the list of symbols and match them 
 (define (subst [what : ExprC] [for : Symbol] [in : ExprC]) : ExprC
   (match in
     [(NumC n) in]
     [(IdC s) (if (symbol=? s for) what in)]
-    [(AppC fun args) (AppC fun (map (lambda (arg) (subst what for arg)) args))]
+    [(AppC fun args) (AppC fun (map (lambda ([arg : ExprC]) (subst what for arg)) args))] ; AppC 'idc ExprC ...
     [(binopC sym l r) (binopC sym (subst what for l) (subst what for r))]
     [(ifleq0? test then else)
      (ifleq0? (subst what for test) (subst what for then) (subst what for else))]))
+
+
+; interp: Interprets the given expression, using the list of funs to resolve applications
+; exp: expression given
+; fds: list of defined functions
+; returns a real number after computed
+(define (interp [exp : ExprC] [fds : (Listof FunDefC)]) : Real
+  (match exp
+    [(NumC n) n]
+    [(IdC n) (error 'interp "OAZO shouldn't get here, ~a" exp)]
+    [(AppC f args) 
+     (define fd (get-fundef f fds))
+     ;(define (substHelper [for : (Listof Symbol)] [args : (Listof ExprC)] [body : ExprC]) : ExprC
+     (interp (substHelper 
+              (FunDefC-arg fd) ; list of symbols 
+              (map (lambda ([arg : ExprC]) (NumC ( interp arg fds)) args)) ; expressions
+             (FunDefC-body fd)) 
+               fds)]
+         ;[(AppC fun args) (AppC fun (map (lambda ([arg : ExprC]) (subst what for arg)) args))
+  ;       (interp (subst (NumC ( interp a fds)) ; map 
+  ;                      (FunDefC-arg fd)
+  ;                      (FunDefC-body fd))
+  ;               fds)] ; lambda here 
+    [(binopC s l r) (cond
+                      [(hash-has-key? binopHash s)
+                       (match s
+                         ['/ (if (eq? (interp r fds) 0)
+                                 (error 'interp "OAZO failed: can't divide by 0")
+                                 ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
+                         [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
+                      [else (error 'interp "OAZO failed: ~a is invalid" exp)])]               
+    [(ifleq0? test then else) (cond
+                                [(>= 0 (interp test fds)) (interp then fds)]
+                                [else (interp else fds)])]))
 

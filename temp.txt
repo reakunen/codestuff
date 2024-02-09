@@ -1,0 +1,27 @@
+; interp: Interprets the given expression, using the list of funs to resolve applications
+; exp: expression given
+; fds: list of defined functions
+; returns a real number after computed 
+(define (interp [exp : ExprC] [fds : (Listof FunDefC)]) : Real
+  (match exp
+    [(NumC n) n]
+    [(IdC n) (match n
+               ['init 0]
+               [other (error 'interp "OAZO shouldn't get here, ~a" exp)])]
+    [(AppC f a) ; function name, a 
+     (define fd (get-fundef f fds))
+         (interp (subst (NumC ( interp a fds)) ; map 
+                        (FunDefC-arg fd)
+                        (FunDefC-body fd))
+                 fds)]
+    [(binopC s l r) (cond
+                      [(hash-has-key? binopHash s)
+                       (match s
+                         ['/ (if (eq? (interp r fds) 0)
+                                 (error 'interp "OAZO failed: can't divide by 0")
+                                 ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
+                         [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
+                      [else (error 'interp "OAZO failed: ~a is invalid" exp)])]               
+    [(ifleq0? test then else) (cond
+                                [(>= 0 (interp test fds)) (interp then fds)]
+                                [else (interp else fds)])]))

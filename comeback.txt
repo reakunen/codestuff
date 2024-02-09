@@ -1,0 +1,65 @@
+
+
+; subst: Replaces the name with another expression
+; what: what we want to replace the name with
+; for: what name we want to perform substitution
+; in: expression we want to do it in
+; returns the expression that is substituted with
+(define (subst [what : ExprC] [for : Symbol ] [in : ExprC] ) : ExprC
+  (match in
+    [(NumC n ) in]
+    [(IdC s) (cond 
+               [(symbol=? s for) what]
+               [else in])]
+    [(AppC fun arg) (AppC fun (subst what for arg))]
+    [(binopC sym l r) (binopC sym (subst what for l ) (subst what for r ))]
+    [(ifleq0? test then else)
+     (ifleq0? (subst what for test) (subst what for then) (subst what for else))]))
+
+
+
+; interp: Interprets the given expression, using the list of funs to resolve applications
+; exp: expression given
+; fds: list of defined functions
+; returns a real number after computed 
+(define (interp [exp : ExprC] [fds : (Listof FunDefC)]) : Real
+  (match exp
+    [(NumC n) n]
+    [(IdC n) (match n
+               ['init 0]
+               [other (error 'interp "OAZO shouldn't get here, ~a" exp)])]
+    [(AppC f a)
+     (define fd (get-fundef f fds))
+     (if (= (length a) 1)
+         (interp (subst (NumC (interp (first a) fds))
+                        (FunDefC-arg fd)
+                        (FunDefC-body fd))
+                 fds)
+         (error 'interp "Expected exactly one argument in application expression"))]
+    [(binopC s l r) (cond
+                      [(hash-has-key? binopHash s)
+                       (match s
+                         ['/ (if (eq? (interp r fds) 0)
+                                 (error 'interp "OAZO failed: can't divide by 0")
+                                 ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
+                         [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
+                      [else (error 'interp "OAZO failed: ~a is invalid" exp)])]               
+    [(ifleq0? test then else) (cond
+                                [(>= 0 (interp test fds)) (interp then fds)]
+                                [else (interp else fds)])]))
+
+
+
+; interp-fns: Interprets the function named main
+; funs: list of defined functions
+; returns the evaluated real number of the program
+(define (interp-fns [funs : (Listof FunDefC)]) : Real
+  (define main (find-main funs))
+  (match main
+    [ExprC (interp main funs)]))
+
+; top-interp: combines parsing and evaluation
+; accepts an s-expression and calls the parse function and then the interp function. (GIVEN)
+(: top-interp (Sexp -> Real))
+(define (top-interp fun-sexps)
+  (interp-fns (parse-prog fun-sexps)))

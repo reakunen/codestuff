@@ -44,7 +44,7 @@
 ; returns a FunDefC struct of the function 
 (define (parse-fundef [s : Sexp] ) : FunDefC
   (match s
-    [(list 'func (list (? symbol? name) (list arg ...) ) ': body) ;list
+    [(list 'func (list (? symbol? name) (? symbol? arg)) ': body)
      (match name
        [(or '+ '- '/ '*)
         (error 'parse-fundef "OAZO failed: Function name cannot be one of +, -, /, *")]
@@ -102,9 +102,9 @@
 (define (interp [exp : ExprC] [fds : (Listof FunDefC)]) : Real
   (match exp
     [(NumC n) n]
-    [(IdC n) (error 'interp "OAZO shouldn't get here, ~a" exp)]
-    ; interp all of the arguments (+ 1 2) 3 11 16, 
-    ; 
+    [(IdC n) (match n
+               ['init 0]
+               [other (error 'interp "OAZO shouldn't get here, ~a" exp)])]
     [(AppC f a) (define fd (get-fundef f fds)) (interp (subst (NumC (interp a fds))
                                                               (FunDefC-arg fd)
                                                               (FunDefC-body fd))
@@ -112,7 +112,7 @@
     [(binopC s l r) (cond
                       [(hash-has-key? binopHash s)
                        (match s
-                         ['/ (if (eq? (interp r fds) 0) ;
+                         ['/ (if (eq? (interp r fds) 0)
                                  (error 'interp "OAZO failed: can't divide by 0")
                                  ((hash-ref binopHash s) (interp l fds) (interp r fds)))]
                          [else ((hash-ref binopHash s) (interp l fds) (interp r fds))])]
@@ -133,8 +133,8 @@
      (match name
        ['main
         (match arg
-          ['() body]
-          [else (error 'find-main "OAZO failed: incorrect number of arguments for main")])]
+          ['init body]
+          [else (error 'find-main "OAZO failed: ~a is an incorrect argument for main" arg)])]
        [else (find-main r)])]))
 
 
@@ -185,15 +185,15 @@
 
 ; top-interp
 (check-equal? (top-interp '{{func {f x} : {+ x 14}}
-                            {func {main '()} : {f 2}}}) 16)
+                            {func {main init} : {f 2}}}) 16)
 
 (check-equal? (top-interp '{{func {double x} : {+ x x}}
-                            {func {main '()} : {double {double 2}}}}) 8)
+                            {func {main init} : {double {double 2}}}}) 8)
 
 (check-exn (regexp
             (regexp-quote "get-fundef: OAZO reference to undefined function, amongus"))
            (lambda () (top-interp '{{func {sussybaka x} : {+ x x}}
-                                    {func {main '()} : {amongus {amongus 2}}}})))
+                                    {func {main init} : {amongus {amongus 2}}}})))
 
 (check-exn (regexp
             (regexp-quote "find-main: OAZO failed: sus is an incorrect argument for main"))
@@ -208,24 +208,24 @@
 (check-equal? (top-interp '(
               (func (minus-five k) :
                     (+ k (* -1 5)))
-              (func (main '()) :
-                    (minus-five (+ 8 '()))))) 3)
+              (func (main init) :
+                    (minus-five (+ 8 init))))) 3)
 
 (check-equal? (top-interp
-               '((func (main '()) :
+               '((func (main init) :
                        (+ (f 13) (f 0)))
                  (func (f qq) : (ifleq0? qq qq (+ qq 1))))) 14)
                 
 ; interp-fns tests
 
 (define interp-test1 (parse-prog '{{func {f x} : {+ x 14}}
-                            {func {main '()} : {f 2}}}))
+                            {func {main init} : {f 2}}}))
 
 (define interp-test2 (parse-prog '{{func {f x} : {+ x x}}
-                            {func {main '()} : {f 2}}}))
+                            {func {main init} : {f 2}}}))
 
 (define interp-test3 (parse-prog '{{func {f x} : {+ {* x 14} 2}}
-    {func {main '()} : {f 2}}})) 
+    {func {main init} : {f 2}}})) 
 
 
 (check-equal? (interp-fns interp-test1) 16)
@@ -269,8 +269,8 @@
            (lambda () (parse-prog 1)))
 
 (check-equal? (parse-prog '{{func {f x} : {+ x 14}}
-                            {func {main '()} : {f 2}}}) (list (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14)))
-                                                               (FunDefC 'main '() (AppC 'f (NumC 2)))))
+                            {func {main init} : {f 2}}}) (list (FunDefC 'f 'x (binopC '+ (IdC 'x) (NumC 14)))
+                                                               (FunDefC 'main 'init (AppC 'f (NumC 2)))))
 
 
 ; parse-fundef tests
@@ -320,4 +320,4 @@
  (subst (NumC 5) 'x ; Substitute 'x with 5
         (binopC '+ (AppC 'double (binopC '* (IdC 'x) (NumC 2))) (NumC 3))) ; Original expression
  (binopC '+ (AppC 'double (binopC '* (NumC 5) (NumC 2))) (NumC 3)) ; Expected result after substitution
- "Test case for substitution within nested function application and binopC failed.")
+ "Test case for substitution within nested function application and binopC failed.") 
