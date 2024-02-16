@@ -129,9 +129,14 @@
     [(binopC sym l r) (binopC sym (subst what for l) (subst what for r))]
     [(ifleq0? test then else)
      (ifleq0? (subst what for test) (subst what for then) (subst what for else))]))
+what if we did if wazo4 implementation using environment instead of subst, what would the difference be concrete syntax to value output
 
-
-
+filter square > 50 
+1) convert list into cons 
+2) writing python in terms of 
+3) wazo implenetation of subst that is wrong that if then else clause wirte a test case that catches error 
+write a test case for subst: it does not substitute the if then else clause 
+'(a (b c))
 ; interp: Interprets the given expression, using the list of funs to resolve applications
 ; exp: expression given
 ; fds: list of defined functions
@@ -255,7 +260,7 @@
 
 (check-equal? (interp (parse '{square {double 2} }) funcList) 16)
 
-(check-equal? (interp (NumC 42) '()) 42 "Interpreting NumC failed.")
+(check-equal? (intexrp (NumC 42) '()) 42 "Interpreting NumC failed.")
 
 (check-exn (regexp (regexp-quote "OAZO shouldn't get here"))(lambda () (interp (IdC 'x) '())))
 
@@ -338,9 +343,6 @@
 
 (check-equal? (subst (NumC 1) 'x (IdC 'y)) (IdC 'y))
 
-;(check-exn (regexp
-;            (regexp-quote "parse: OAZO failed: (Amongus In Real Life (SUSSYBAKA)) is invalid"))
-;           (lambda () (parse '{Amongus In Real Life {SUSSYBAKA}})))
 
 (check-exn (regexp
             (regexp-quote "parse: OAZO failed: (+ b) is invalid IdC"))
