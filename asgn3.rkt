@@ -4,17 +4,18 @@
 ; Finished Asgn3, all test cases passed.
 
 ; ExprC Definition, from SECTION 5.1 Book
-(define-type ExprC (U NumC IdC AppC binopC ifleq0?))
-(struct NumC ([n : Real]) #:transparent)                    ; Number 
-(struct IdC ([s : Symbol]) #:transparent)                   ; Id 
-(struct AppC ([fun : Symbol] [arg : (Listof ExprC)]) #:transparent)  ; Function Application
-(struct ifleq0? ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent ) ; 0 >= x
-(struct binopC ([op : Symbol] [l : ExprC] [r : ExprC]) #:transparent) ; Takes care of binary operations 
+(define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
+(struct NumC ([n : Real]) #:transparent)         ; Number 
+(struct IdC ([s : Symbol]) #:transparent)        ; Id
+(struct StrC ([s : Symbol]) #:transparent)       ; String
+(struct IfC ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent )    ; If-else statement
+(struct LetC ([names : (Listof IdC)] [defs : (Listof ExprC)] [expr : ExprC]) #:transparent)    ; Local vars
+(struct AnonC ([args : (Listof Symbol)] [exp : ExprC]) #:transparent)    ; Takes care of binary operations 
+(struct AppC ([fun : ExprC] [arg : (Listof ExprC)]) #:transparent)    ; Function Application
 
 
 ; hash table for operator names and meanings
 (define binopHash (hash '+ + '- - '* * '/ /))
-
 
 
 ; parse: takes in an s-expression, returns the associated ExprC  
@@ -253,7 +254,7 @@
 
 (check-equal? (interp (parse '{square {double 2} }) funcList) 16)
 
-(check-equal? (intexrp (NumC 42) '()) 42 "Interpreting NumC failed.")
+(check-equal? (interp (NumC 42) '()) 42 "Interpreting NumC failed.")
 
 (check-exn (regexp (regexp-quote "OAZO shouldn't get here"))(lambda () (interp (IdC 'x) '())))
 
@@ -348,4 +349,3 @@
         (binopC '+ (AppC 'double (list (binopC '* (IdC 'x) (NumC 2)))) (NumC 3))) ; Original expression
  (binopC '+ (AppC 'double (list (binopC '* (NumC 5) (NumC 2)))) (NumC 3)) ; Expected result after substitution
  "Test case for substitution within nested function application and binopC failed.")
-
