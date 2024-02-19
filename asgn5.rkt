@@ -1,21 +1,30 @@
 #lang typed/racket
 (require typed/rackunit)
 
-; Finished Asgn3, all test cases passed.
+; Finished Asgn4, all test cases passed.
 
 ; ExprC Definition, from SECTION 5.1 Book
-(define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
-(struct NumC ([n : Real]) #:transparent)         ; Number 
-(struct IdC ([s : Symbol]) #:transparent)        ; Id
-(struct StrC ([s : Symbol]) #:transparent)       ; String
-(struct IfC ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent )    ; If-else statement
-(struct LetC ([names : (Listof IdC)] [defs : (Listof ExprC)] [expr : ExprC]) #:transparent)    ; Local vars
-(struct AnonC ([args : (Listof Symbol)] [exp : ExprC]) #:transparent)    ; Takes care of binary operations 
-(struct AppC ([fun : ExprC] [arg : (Listof ExprC)]) #:transparent)    ; Function Application
+(define-type ExprC (U NumC IdC AppC binopC ifleq0?))
+(struct NumC ([n : Real]) #:transparent)                    ; Number 
+(struct IdC ([s : Symbol]) #:transparent)                   ; Id 
+(struct AppC ([fun : Symbol] [arg : (Listof ExprC)]) #:transparent)  ; Function Application
+(struct ifleq0? ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent ) ; 0 >= x
+(struct binopC ([op : Symbol] [l : ExprC] [r : ExprC]) #:transparent) ; Takes care of binary operations 
+
+; Updated ExprC
+;(define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
+;(struct NumC ([n : Real]) #:transparent)         ; Number 
+;(struct IdC ([s : Symbol]) #:transparent)        ; Id
+;(struct StrC ([s : Symbol]) #:transparent)       ; String
+;(struct IfC ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent )    ; If-else statement
+;(struct LetC ([names : (Listof IdC)] [defs : (Listof ExprC)] [expr : ExprC]) #:transparent)    ; Local vars
+;(struct AnonC ([args : (Listof Symbol)] [exp : ExprC]) #:transparent)    ; Takes care of binary operations 
+;(struct AppC ([fun : ExprC] [arg : (Listof ExprC)]) #:transparent)    ; Function Application
 
 
 ; hash table for operator names and meanings
 (define binopHash (hash '+ + '- - '* * '/ /))
+
 
 
 ; parse: takes in an s-expression, returns the associated ExprC  
@@ -38,8 +47,10 @@
     [other (error 'parse "OAZO failed: ~a is invalid" s)]))
     
 
+
 ; Function definition (GIVEN)
 (struct FunDefC ([name : Symbol] [arg : (Listof Symbol)] [body : ExprC]) #:transparent)
+
 
 
 ; parse-fundef: Parses a function definition
@@ -130,24 +141,45 @@
     [(binopC sym l r) (binopC sym (subst what for l) (subst what for r))]
     [(ifleq0? test then else)
      (ifleq0? (subst what for test) (subst what for then) (subst what for else))]))
-     
+
+
+
+; Environment definitions
+(define-type Env (Listof Binding))
+(struct Binding ((name : Symbol) (val : Real)) #:transparent)
+(define mt-env '())
+(define extend-env cons)
+
+
+
+; Searches for a given variable in the given environment
+(define (lookup [for : Symbol] [env : Env]) : Real
+  (match env
+    ['() (error 'lookup "name not found: ~e" for)]
+    [(cons (Binding name val) r) (cond
+                                   [(symbol=? for name) val]
+                                   [else (lookup for r)])]))
+
+
+
 ; interp: Interprets the given expression, using the list of funs to resolve applications
 ; exp: expression given
 ; fds: list of defined functions
 ; returns a real number after computed
-(define (interp [exp : ExprC] [fds : (Listof FunDefC)]) : Real
+(define (interp [exp : ExprC] [env : Env] [fds : (Listof FunDefC)]) : Real
   (match exp
     [(NumC n) n]
-    [(IdC n) (error 'interp "OAZO shouldn't get here, ~a" exp)]
-    ;(struct AppC ([fun : Symbol] [arg : (Listof ExprC)]) #:transparent)  ; Function Application
+    [(IdC n) (lookup n env)]
     [(AppC f args) 
-     (define fd (get-fundef f fds))
-     ;(define (substHelper [for : (Listof Symbol)] [args : (Listof ExprC)] [body : ExprC]) : ExprC
-     (interp (substHelper 
-              (FunDefC-arg fd) ; list of symbols 
-              (map (lambda ([arg : ExprC]) (NumC (interp arg fds))) args) ; expressions
-             (FunDefC-body fd)) 
-               fds)]
+     (define fd (get-fundef f fds))  ; function
+     (define env2 mt-env)  ; env (args)
+     (map (lambda ([param : Symbol] [arg : ExprC]) (extend-env  
+                                   (Binding param (interp arg env fds))
+                                   env2)) (FunDefC-arg fd) args)  
+     (interp (FunDefC-body fd)
+             env2
+             fds)]
+    ; ------------------------ TODO ------------------------  
     [(binopC s l r) (cond
                       [(hash-has-key? binopHash s)
                        (match s
