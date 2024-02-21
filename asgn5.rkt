@@ -41,14 +41,14 @@
     [(BoolV b) (match b
                   [#t "true"]
                   [#f "false"])]
-    [(StrV s) (~a s)]
+    [(StrV s) (~v s)]
     [(CloV args body env ) "#<procedure>"]
     [(PrimV op) "#<primop>"]))
 
 ; Checks if idc is valid 
 (define (valid? [id : Sexp]) : Boolean
   (match id
-    [(or 'let 'if 'anon 'then 'else '<-) #f]
+    [(or 'let 'if 'anon 'then 'else '<- ':) #f]
     [else #t]))
 
 ; checks if it is a valid let
@@ -123,7 +123,11 @@
            [(list (NumV a) (NumV b)) (BoolV (<= a b))]
            [else (error 'eval-prim "OAZO: Invalid types given for <= operation")])]
     ['equal? (match (list l r)
-               [(list (NumV a) (NumV b)) (BoolV (= a b))])]
+               [(list (NumV a) (NumV b)) (BoolV (= a b))]
+               [(list (BoolV a) (BoolV b)) (BoolV (equal? a b))]
+               [(list (StrV a) (StrV b)) (BoolV (equal? a b))]
+               [other (BoolV #f)]
+               )]
     ['+ (match (list l r)
           [(list (NumV a) (NumV b)) (NumV (+ a b))]
           [else (error 'eval-prim "OAZO: Invalid types given for + operation")])]
@@ -143,6 +147,10 @@
 
 
 (check-equal? (eval-prim '+ (NumV 6) (NumV 4)) (NumV 10))
+(check-equal? (eval-prim 'equal? (PrimV 'a) (PrimV 'd)) (BoolV #f))
+(check-equal? (eval-prim 'equal? (BoolV #t) (BoolV #t)) (BoolV #t))
+(check-equal? (eval-prim 'equal? (StrV "sus") (StrV "baka")) (BoolV #f))
+
 
 ;looks up a symbol in the environment 
 (define (lookup [for : Symbol] [env : Env]) : ValV
@@ -310,7 +318,7 @@
 (check-equal? (serialize (NumV 5)) "5")
 (check-equal? (serialize (BoolV #t)) "true")
 (check-equal? (serialize (BoolV #f)) "false")
-(check-equal? (serialize (StrV "hello")) "hello")
+(check-equal? (serialize (StrV "hello")) "\"hello\"")
 (check-equal? (serialize (CloV '() (NumC 5) mt-env)) "#<procedure>")
 (check-equal? (serialize (PrimV '+)) "#<primop>")
 
@@ -322,11 +330,12 @@
           (z <- 9)
           (z)))))
 
-(check-exn (regexp (regexp-quote "interp: OAZO: user-error : 1234"))
+(check-exn (regexp (regexp-quote "interp: OAZO: user-error : \"1234\""))
            (lambda () (top-interp '(+ 4 (error "1234")))))
 
 (check-exn (regexp (regexp-quote "parse: OAZO: Invalid Ids (:)"))
            (lambda ()  (parse '(let (: <- "") "World"))))
 
-
+;your code failed a test: (top-interp (quote (if true then "one" else "two"))) evaluated to "one", expecting "\"one\""
+;Saving submission with errors.
 
