@@ -2,7 +2,7 @@
 
 (require typed/rackunit)
 
-; Finished Asgn5, 3 tests failed :( 
+; Finished Asgn5
 
 ; ExprC definitions
 (define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
@@ -29,8 +29,7 @@
 (struct BoolV ([b : Boolean]) #:transparent)
 (struct StrV ([str : String]) #:transparent)
 (struct CloV ([args : (Listof Symbol)] [body : ExprC] [env : Env]) #:transparent)
-; primitive operators
-(struct PrimV ([op : Symbol]) #:transparent)     ; should be 
+(struct PrimV ([op : Symbol]) #:transparent)                  ; primitives
 (struct ErrV ([e : (-> ValV String)]) #:transparent)          ; error 
 
 
@@ -45,16 +44,18 @@
     [(CloV args body env ) "#<procedure>"]
     [(PrimV op) "#<primop>"]))
 
+
 ; Checks if idc is valid 
 (define (valid? [id : Sexp]) : Boolean
   (match id
     [(or 'let 'if 'anon 'then 'else '<- ':) #f]
     [else #t]))
 
+
 ; checks if it is a valid let
 (define (validLet? [id : (Listof Symbol)]) : Boolean
    (ormap (lambda ([s : Symbol]) (or (equal? s ':) (equal? s '<-))) id))
-  ; if : or <- is in the id then return false else true))
+
 
 ; parse: takes in an s-expression, returns the associated ExprC  
 (define (parse [s : Sexp]) : ExprC
@@ -65,8 +66,6 @@
                     [else (IdC n)])] ; id 
     [(? string? n) (StrC n)] ; string
     [(list 'if test 'then then 'else else) (IfC (parse test) (parse then) (parse else))] ; if
-    ;[(list 'let (list (? symbol? id) '<- expr) ... body) (LetC (cast id (Listof Symbol))
-                                           ; (map parse (cast expr (Listof Sexp))) (parse body))]
     [(list 'let (list (? symbol? id) '<- expr) ... body)
      (define ids (cast id (Listof Symbol)))
      (cond
@@ -77,7 +76,6 @@
      (if (check-duplicates args) (error 'parse "OAZO: Duplicate arguments ~a" args) args)
      (AnonC args (parse expr))] ; anon
     [(list exprs ...) (AppC (parse (first exprs)) (map parse (rest exprs)))] ; AppC
-    ;[other (error 'parse "OAZO failed: ~a is invalid" s)]
     ))
 
 ; interp: takes in an ExprC and Environmnet, returns a ValV
@@ -93,7 +91,6 @@
                                    [b (interp then env) ] 
                                    [else (interp else env)])]
                             [else (error 'interp "OAZO is not a BoolV")])]
-    ;(struct LetC ([names : (Listof Symbol)] [defs : (Listof ExprC)] [expr : ExprC]) #:transparent)    ; let Local vars
     [(LetC names defs expr)
      (define values (map (lambda ([def : ExprC]) (interp def env)) defs))
      (define new-env (extend-bindings names values env))
@@ -145,14 +142,7 @@
           [else (error 'eval-prim "OAZO: Invalid types given for / operation")])]))
 
 
-
-(check-equal? (eval-prim '+ (NumV 6) (NumV 4)) (NumV 10))
-(check-equal? (eval-prim 'equal? (PrimV 'a) (PrimV 'd)) (BoolV #f))
-(check-equal? (eval-prim 'equal? (BoolV #t) (BoolV #t)) (BoolV #t))
-(check-equal? (eval-prim 'equal? (StrV "sus") (StrV "baka")) (BoolV #f))
-
-
-;looks up a symbol in the environment 
+; looks up a symbol in the environment 
 (define (lookup [for : Symbol] [env : Env]) : ValV
   (match env
     ['() (error 'lookup "OAZO name not found: ~e" for)]
@@ -176,7 +166,6 @@
 
 
 ; Top Level Environment
-
 ; top-interp: takes in a s-expression, returns a string
 (define (top-interp [s : Sexp]) : String
   (define top-env
@@ -191,6 +180,7 @@
         (Binding 'false (BoolV #f))))
   (serialize (interp (parse s) top-env)))
 
+; gives a user error 
 (define (user-error [v : ValV]) : String
   (string-append "OAZO: user-error : " (serialize v)))
 
@@ -314,13 +304,20 @@
 (check-equal? (parse '{anon {z y} : {+ z y}}) (AnonC '(z y) (AppC (IdC '+) (list (IdC 'z) (IdC 'y)))))
 
 
-; serialize test cases
+; -- serialize test cases --
 (check-equal? (serialize (NumV 5)) "5")
 (check-equal? (serialize (BoolV #t)) "true")
 (check-equal? (serialize (BoolV #f)) "false")
 (check-equal? (serialize (StrV "hello")) "\"hello\"")
 (check-equal? (serialize (CloV '() (NumC 5) mt-env)) "#<procedure>")
 (check-equal? (serialize (PrimV '+)) "#<primop>")
+
+
+; -- eval-prim test cases --
+(check-equal? (eval-prim '+ (NumV 6) (NumV 4)) (NumV 10))
+(check-equal? (eval-prim 'equal? (PrimV 'a) (PrimV 'd)) (BoolV #f))
+(check-equal? (eval-prim 'equal? (BoolV #t) (BoolV #t)) (BoolV #t))
+(check-equal? (eval-prim 'equal? (StrV "sus") (StrV "baka")) (BoolV #f))
 
 
 ; other test cases 
@@ -335,7 +332,4 @@
 
 (check-exn (regexp (regexp-quote "parse: OAZO: Invalid Ids (:)"))
            (lambda ()  (parse '(let (: <- "") "World"))))
-
-;your code failed a test: (top-interp (quote (if true then "one" else "two"))) evaluated to "one", expecting "\"one\""
-;Saving submission with errors.
 
