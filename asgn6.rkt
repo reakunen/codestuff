@@ -2,7 +2,7 @@
 
 (require typed/rackunit)
 
-; Finished Asgn5
+; Started Asgn6
 
 ; ExprC definitions
 (define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
@@ -17,7 +17,7 @@
 
 
 ; Environment definitions, from book
-(define-type Env [Listof Binding])
+(define-type Env [(Listof Binding)])
 (struct Binding ([name : Symbol] [val : ValV]) #:transparent)
 (define mt-env '())
 (define extend-env cons)
@@ -78,7 +78,7 @@
     [(list exprs ...) (AppC (parse (first exprs)) (map parse (rest exprs)))] ; AppC
     ))
 
-; interp: takes in an ExprC and Environmnet, returns a ValV
+; interp: takes in an ExprC and Environmnet, returns a ValV 
 ; interprets a given expression
 (define (interp [exp : ExprC] [env : Env]) : ValV
   (match exp
@@ -105,41 +105,49 @@
                                [else (error 'interp "OAZO incorrect number of arguments ~a" args)]
        )]
        [(ErrV e) (error 'interp (e (interp (first args) env)))]
-       [(PrimV op) ; evaluates the primitives 
-        (cond
-          [(not ( = (length args) 2)) (error 'interp "OAZO incorrect number of arguments ~a" a)]
-          [else (eval-prim op (interp (first args) env ) (interp (second args) env))])]
-      [other (error 'interp (format "OAZO: user-error ~a" exp))]
-  )]))
+       [(PrimV op) ; evaluates the primitives ***UPDATE***
+        (eval-prim op args)])]
+      [other (error 'interp (format "OAZO: user-error ~a" exp))]))
 
 
-; helper to evaluate the primitives
-(define (eval-prim [op : Symbol] [l : ValV] [r : ValV]) : ValV
+; helper to evaluate the primitives ***UPDATE***
+(define (eval-prim [op : Symbol] [vals : (Listof ValV)]) : ValV
   (match op
-    ['<= (match (list l r)
-           [(list (NumV a) (NumV b)) (BoolV (<= a b))]
-           [else (error 'eval-prim "OAZO: Invalid types given for <= operation")])]
-    ['equal? (match (list l r)
-               [(list (NumV a) (NumV b)) (BoolV (= a b))]
-               [(list (BoolV a) (BoolV b)) (BoolV (equal? a b))]
-               [(list (StrV a) (StrV b)) (BoolV (equal? a b))]
-               [other (BoolV #f)]
-               )]
-    ['+ (match (list l r)
-          [(list (NumV a) (NumV b)) (NumV (+ a b))]
-          [else (error 'eval-prim "OAZO: Invalid types given for + operation")])]
-    ['- (match (list l r)
-          [(list (NumV a) (NumV b)) (NumV (- a b))]
-          [else (error 'eval-prim "OAZO: Invalid types given for - operation")])]
-    ['* (match (list l r)
-          [(list (NumV a) (NumV b)) (NumV (* a b))]
-          [else (error 'eval-prim "OAZO: Invalid types given for * operation")])]
-    ['/ (match (list l r)
-          [(list (NumV a) (NumV b))
-           (if (= b 0)
-               (error 'eval-prim "OAZO: Division by zero")
-               (NumV (/ a b)))]
-          [else (error 'eval-prim "OAZO: Invalid types given for / operation")])]))
+    [(or '<= 'equal? '+ '- '* '/)
+     (cond
+       [(not ( = (length vals) 2)) (error 'interp "OAZO incorrect number of arguments ~a" a)]
+       [else (match op
+               ['<= (match (list (first vals) (first (list-tail vals 1)))
+                      [(list (NumV a) (NumV b)) (BoolV (<= a b))]
+                      [else (error 'eval-prim "OAZO: Invalid types given for <= operation")])]
+               ['equal? (match (list (first vals) (first (list-tail vals 1)))
+                          [(list (NumV a) (NumV b)) (BoolV (= a b))]
+                          [(list (BoolV a) (BoolV b)) (BoolV (equal? a b))]
+                          [(list (StrV a) (StrV b)) (BoolV (equal? a b))]
+                          [other (BoolV #f)]
+                          )]
+               ['+ (match (list (first vals) (first (list-tail vals 1)))
+                     [(list (NumV a) (NumV b)) (NumV (+ a b))]
+                     [else (error 'eval-prim "OAZO: Invalid types given for + operation")])]
+               ['- (match (list (first vals) (first (list-tail vals 1)))
+                     [(list (NumV a) (NumV b)) (NumV (- a b))]
+                     [else (error 'eval-prim "OAZO: Invalid types given for - operation")])]
+               ['* (match (list (first vals) (first (list-tail vals 1)))
+                     [(list (NumV a) (NumV b)) (NumV (* a b))]
+                     [else (error 'eval-prim "OAZO: Invalid types given for * operation")])]
+               ['/ (match (list (first vals) (first (list-tail vals 1)))
+                     [(list (NumV a) (NumV b))
+                      (if (= b 0)
+                          (error 'eval-prim "OAZO: Division by zero")
+                          (NumV (/ a b)))]
+                     [else (error 'eval-prim "OAZO: Invalid types given for / operation")])])])]
+    ;(Binding 'println (PrimV 'println))
+    ;(Binding 'read-num (PrimV 'read-num))
+    ;(Binding 'seq (PrimV 'seq))
+    ;(Binding '++ (PrimV '++))
+    ['println (match (list s)
+                []
+                [else (error 'eval-prim "OAZO: Invalid types given for println operation")])]))
 
 
 ; looks up a symbol in the environment 
@@ -175,6 +183,10 @@
         (Binding '/ (PrimV '/))
         (Binding '<= (PrimV '<=))
         (Binding 'equal? (PrimV 'equal?))
+        (Binding 'println (PrimV 'println))
+        (Binding 'read-num (PrimV 'read-num))
+        (Binding 'seq (PrimV 'seq))
+        (Binding '++ (PrimV '++))
         (Binding 'true (BoolV #t))
         (Binding 'error (ErrV user-error))
         (Binding 'false (BoolV #f))))
@@ -332,4 +344,3 @@
 
 (check-exn (regexp (regexp-quote "parse: OAZO: Invalid Ids (:)"))
            (lambda ()  (parse '(let (: <- "") "World"))))
-
