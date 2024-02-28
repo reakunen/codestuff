@@ -137,8 +137,9 @@
                (cond
                  [(real? input) (NumV input)]
                  [else (error 'eval-prim "OAZO: Input NaN ~a" input)]))]
-    ['++ (StrV (join-helper vals))]
-    ['seq (last vals)]
+    ['++ (StrV (string-append* (map (λ ([val : ValV])  (coerceString val)) vals)))]
+
+    ['seq (last vals)] ; 3 seq 2 1  
     [(or '<= 'equal? '+ '- '* '/)
      (cond
        [(not (= (length vals) 2)) (error 'eval-prim "OAZO: incorrect number of arguments ~a" vals)]
