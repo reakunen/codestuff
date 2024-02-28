@@ -4,6 +4,7 @@
 
 ; Started Asgn6
 
+
 ; ExprC definitions
 (define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
 (struct NumC ([n : Real]) #:transparent)         ; Number 
@@ -13,7 +14,6 @@
 (struct LetC ([names : (Listof Symbol)] [defs : (Listof ExprC)] [expr : ExprC]) #:transparent)    ; let Local vars
 (struct AnonC ([args : (Listof Symbol)] [exp : ExprC]) #:transparent)    ; Anonymous function 
 (struct AppC ([fun : ExprC] [arg : (Listof ExprC)]) #:transparent)    ; Function Application
-
 
 
 ; Environment definitions, from book 
@@ -54,7 +54,7 @@
 
 ; checks if it is a valid let
 (define (validLet? [id : (Listof Symbol)]) : Boolean
-   (ormap (lambda ([s : Symbol]) (or (equal? s ':) (equal? s '<-))) id))
+   (ormap (λ ([s : Symbol]) (or (equal? s ':) (equal? s '<-))) id))
 
 
 ; parse: takes in an s-expression, returns the associated ExprC  
@@ -78,7 +78,8 @@
     [(list exprs ...) (AppC (parse (first exprs)) (map parse (rest exprs)))] ; AppC
     ))
 
-; interp: takes in an ExprC and Environmnet, returns a ValV 
+
+; interp: takes in an ExprC and Environment, returns a ValV 
 ; interprets a given expression
 (define (interp [exp : ExprC] [env : Env]) : ValV
   (match exp
@@ -92,20 +93,20 @@
                                    [else (interp else env)])]
                             [else (error 'interp "OAZO is not a BoolV")])]
     [(LetC names defs expr)
-     (define values (map (lambda ([def : ExprC]) (interp def env)) defs))
+     (define values (map (λ ([def : ExprC]) (interp def env)) defs))
      (define new-env (extend-bindings names values env))
      (interp expr new-env)]
     [(AnonC args exp) (CloV args exp env)]
     [(AppC fun args)
      (define functionValue (interp fun env))
-     (define argVals (map (lambda ([arg : ExprC]) (interp arg env)) args))
+     (define argVals (map (λ ([arg : ExprC]) (interp arg env)) args))
      (match functionValue 
        [(CloV args body env) (cond
                                [(= (length args) (length argVals)) (interp body (extend-bindings args argVals env))]
                                [else (error 'interp "OAZO incorrect number of arguments ~a" args)]
        )]
        [(ErrV e) (error 'interp (e (interp (first args) env)))]
-       [(PrimV op) ; evaluates the primitives ***UPDATE***
+       [(PrimV op) ; evaluates the primitives
         (eval-prim op argVals)])]
       [other (error 'interp (format "OAZO: user-error ~a" exp))]))
 
@@ -116,6 +117,7 @@
     ['() ""]
     [(cons f r) (string-append (coerceString f) (join-helper r))]))
 
+
 ; helper to coerce ValV into string types
 (define (coerceString [v : ValV]) : String
   (match v
@@ -123,7 +125,8 @@
     [(StrV s) s]
     ))
 
-; helper to evaluate the primitives ***UPDATE***
+
+; helper to evaluate the primitives
 (define (eval-prim [op : Symbol] [vals : (Listof ValV)]) : ValV
   (match op
     ['println (cond
@@ -135,6 +138,7 @@
                  [(real? input) (NumV input)]
                  [else (error 'eval-prim "OAZO: Input NaN ~a" input)]))]
     ['++ (StrV (join-helper vals))]
+    ['seq (last vals)]
     [(or '<= 'equal? '+ '- '* '/)
      (cond
        [(not (= (length vals) 2)) (error 'eval-prim "OAZO: incorrect number of arguments ~a" vals)]
@@ -182,7 +186,7 @@
 ; extends multiple environments based on arguments, adds binding  
 (define (extend-bindings [args : (Listof Symbol)] [vals : (Listof ValV)] [env : Env]) : Env
   ((inst foldl Symbol ValV Env)
-   (lambda (arg val env) (extend arg val env))
+   (λ (arg val env) (extend arg val env))
    env
    args
    vals))
@@ -207,9 +211,11 @@
         (Binding 'false (BoolV #f))))
   (serialize (interp (parse s) top-env)))
 
+
 ; returns a user error itself 
 (define (user-error [v : ValV]) : String
   (string-append "OAZO: user-error : " (serialize v)))
+
 
 ; -- eval-prim test cases --
 (check-equal? (eval-prim '+ (list (NumV 6) (NumV 4))) (NumV 10))
@@ -218,8 +224,16 @@
 (check-equal? (eval-prim 'equal? (list(StrV "sus") (StrV "baka"))) (BoolV #f))
 
 (check-exn (regexp (regexp-quote "interp: OAZO: user-error : \"1234\""))
-           (lambda () (top-interp '(+ 4 (error "1234")))))
+           (λ () (top-interp '(+ 4 (error "1234")))))
 
 (top-interp '{let {your-number <- {read-num}}
                {println {++ "Interesting. You picked " your-number ". good choice!"}}}) ; returns "true"
 
+(top-interp '{seq
+              {println "What is your favorite integer between 6 and 7?"}
+              {let {your-number <- {read-num}}
+                {println {++ "Interesting. You picked " your-number ". good choice!"}}}})
+
+
+; -- OAZO6 program --
+;()
