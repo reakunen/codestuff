@@ -2,7 +2,7 @@
 
 (require typed/rackunit)
 
-; Started Asgn6
+; Finished Assignment 6 
 
 
 ; ExprC definitions
@@ -45,14 +45,14 @@
     [(PrimV op) "#<primop>"]))
 
 
-; Checks if idc is valid 
+; valid?: checks if idc is valid 
 (define (valid? [id : Sexp]) : Boolean
   (match id
     [(or 'let 'if 'anon 'then 'else '<- ': ) #f]
     [else #t]))
 
 
-; checks if it is a valid let
+; validLet?: checks if it is a valid let
 (define (validLet? [id : (Listof Symbol)]) : Boolean
    (ormap (λ ([s : Symbol]) (or (equal? s ':) (equal? s '<-))) id))
 
@@ -107,26 +107,19 @@
        )]
        [(ErrV e) (error 'interp (e (interp (first args) env)))]
        [(PrimV op) ; evaluates the primitives
-        (eval-prim op argVals)])]
+        (eval-prim op argVals)]
+       [other (error 'interp (format "OAZO: invalid operator"))])]
       [other (error 'interp (format "OAZO: user-error ~a" exp))]))
 
 
-; helper to evaluate ++ procedure 
-(define (join-helper [lst : (Listof ValV)] ) : String
-  (match lst
-    ['() ""]
-    [(cons f r) (string-append (coerceString f) (join-helper r))]))
-
-
-; helper to coerce ValV into string types
+; coerceString: helper to coerce ValV into string types
 (define (coerceString [v : ValV]) : String
   (match v
     [(NumV n) (number->string n)] 
-    [(StrV s) s]
-    ))
+    [(StrV s) s]))
 
 
-; helper to evaluate the primitives
+; eval-prim: helper to evaluate the primitives
 (define (eval-prim [op : Symbol] [vals : (Listof ValV)]) : ValV
   (match op
     ['println (cond
@@ -138,8 +131,7 @@
                  [(real? input) (NumV input)]
                  [else (error 'eval-prim "OAZO: Input NaN ~a" input)]))]
     ['++ (StrV (string-append* (map (λ ([val : ValV])  (coerceString val)) vals)))]
-
-    ['seq (last vals)] ; 3 seq 2 1  
+    ['seq (last vals)]
     [(or '<= 'equal? '+ '- '* '/)
      (cond
        [(not (= (length vals) 2)) (error 'eval-prim "OAZO: incorrect number of arguments ~a" vals)]
@@ -167,7 +159,8 @@
                       (if (= b 0)
                           (error 'eval-prim "OAZO: Division by zero")
                           (NumV (/ a b)))]
-                     [other (error 'eval-prim "OAZO: Invalid types given for / operation")])])])]))
+                     [other (error 'eval-prim "OAZO: Invalid types given for / operation")])])])]
+    [other (error 'eval-prim "OAZO: Invalid operator" op) ]))
 
 
 ; looks up a symbol in the environment 
@@ -224,17 +217,147 @@
 (check-equal? (eval-prim 'equal? (list(BoolV #t) (BoolV #t))) (BoolV #t))
 (check-equal? (eval-prim 'equal? (list(StrV "sus") (StrV "baka"))) (BoolV #f))
 
+; -- Interp test cases TO DO -- 
 (check-exn (regexp (regexp-quote "interp: OAZO: user-error : \"1234\""))
            (λ () (top-interp '(+ 4 (error "1234")))))
 
-(top-interp '{let {your-number <- {read-num}}
-               {println {++ "Interesting. You picked " your-number ". good choice!"}}}) ; returns "true"
+(define d '{let
+  {z <- {+ 9 14}}
+  {y <- 98}
+  {+ z y}} 
+)
 
-(top-interp '{seq
-              {println "What is your favorite integer between 6 and 7?"}
-              {let {your-number <- {read-num}}
-                {println {++ "Interesting. You picked " your-number ". good choice!"}}}})
+(define a '{let
+                {z <- 98}
+             {+ z z }})
 
+(define b '{{anon {z y} : {+ z y}}
+ {+ 9 14}
+ 98})
+
+(define test1 '{let
+  {z <- {- 9 14}}
+  {y <- 98}
+  {b <- {* 3 14}}
+  {a <- {/ 9 14}}             
+  {- z b}} 
+)
+
+(define test2 '{let
+  {z <- {- 9 14}}
+  {y <- 98}
+  {b <- {* 3 14}}
+  {a <- {/ 9 14}}
+  {- 1}} 
+)
+
+(define test3 '{{anon {z y} : {+ z y}}
+ {+ 9 d}
+ 98})
+
+(define test4 '{let
+  {z <- {/ 0 0}}
+  {y <- 98}
+  {+ z y}} 
+)
+
+(define test5 '{let
+  {z <- {0 0}}
+  {y <- 98}
+  {+ z y}} 
+)
+
+(define test6 '{let
+  {g <- {<= 5 2}}
+  {z <- {+ 5 2}}            
+  {y <- 58}
+  {gg <- "bsduaf"}
+  {f <- {anon {z y } : {+ z y}}}
+  {if {equal? 4 {f 2 4}} then {+ 4 {f 6 3}} else {- 3 {f 5 2}}}} 
+)
+
+(define test7 '{{anon {z y d} : {+ z {+ d y}}}
+ {+ 4 4}
+ 98})
+
+(define test8 '{let
+  {g <- {<= 5 2}}
+  {z <- {+ 5 2}}            
+  {y <- 58}
+  {gg <- "bsduaf"}
+  {if z then {+ 4 3} else {- 3 2}}})
+
+(define test9 '{let
+  {g <- {<= 5 2}}
+  {z <- {+ 5 2}}            
+  {y <- 58}
+  {gg <- "bsduaf"}
+  {if {<= z 99} then {+ 4 3} else {- 3 2}}})
+
+
+; -- top-interp test cases --
+(check-equal? (top-interp test9) "7")
+(check-exn (regexp (regexp-quote "interp: OAZO is not a BoolV"))
+           (lambda () (top-interp test8)))
+(check-exn (regexp (regexp-quote "interp: OAZO incorrect number of arguments (z y d)"))
+           (lambda () (top-interp test7)))
+(check-equal? (top-interp test6) "-4")
+(check-exn (regexp (regexp-quote "eval-prim: OAZO: Division by zero"))
+           (lambda () (top-interp test4)))
+(check-exn (regexp (regexp-quote "lookup: OAZO name not found: 'd"))
+           (lambda () (top-interp test3)))
+(check-equal? (top-interp test1) "-47")
+(check-equal? (top-interp d) (top-interp b))
+
+(check-exn (regexp (regexp-quote "eval-prim: OAZO: Invalid types given for + operation"))
+           (lambda () (top-interp '(+ + +))))
+(check-exn (regexp (regexp-quote "eval-prim: OAZO: Invalid types given for * operation"))
+           (lambda () (top-interp '(* * *))))
+(check-exn (regexp (regexp-quote "eval-prim: OAZO: Invalid types given for / operation"))
+           (lambda () (top-interp '(/ / /))))
+(check-exn (regexp (regexp-quote "eval-prim: OAZO: Invalid types given for - operation"))
+           (lambda () (top-interp '(- - -))))
+(check-exn (regexp (regexp-quote "eval-prim: OAZO: Invalid types given for <= operation"))
+           (lambda () (top-interp '(<= <= <=))))
+
+(define t1 '{{anon {z z z} : {+ z y}}
+ {+ 9 d}
+ 98})
+
+
+; -- parse test cases --
+(check-equal? (parse "abcdefg") (StrC "abcdefg")) 
+(check-exn (regexp (regexp-quote "parse: OAZO: Duplicate arguments (z z z)"))
+           (lambda () (top-interp t1)))
+(check-exn (regexp (regexp-quote "parse: OAZO: Invalid Idc anon"))
+           (lambda () (parse '{anon : })))
+(check-equal? (parse a) (LetC '(z) (list (NumC 98)) (AppC (IdC '+) (list (IdC 'z) (IdC 'z)))))
+(check-equal? (parse '{+ 5 6}) (AppC (IdC '+) (list (NumC 5) (NumC 6))))
+(check-equal? (parse '{if 5 then 2 else 6})  (IfC (NumC 5) (NumC 2) (NumC 6)))
+(check-equal? (parse '{anon {z y} : {+ z y}}) (AnonC '(z y) (AppC (IdC '+) (list (IdC 'z) (IdC 'y)))))
+
+
+; -- serialize test cases --
+(check-equal? (serialize (NumV 5)) "5")
+(check-equal? (serialize (BoolV #t)) "true")
+(check-equal? (serialize (BoolV #f)) "false")
+(check-equal? (serialize (StrV "hello")) "\"hello\"")
+(check-equal? (serialize (CloV '() (NumC 5) mt-env)) "#<procedure>")
+(check-equal? (serialize (PrimV '+)) "#<primop>")
+
+
+; other test cases 
+(check-exn (regexp (regexp-quote "parse: OAZO: Invalid duplicate variable (z z)"))
+           (lambda () (parse '(let
+          (z <- (anon () : 3))
+          (z <- 9)
+          (z)))))
+
+(check-exn (regexp (regexp-quote "interp: OAZO: user-error : \"1234\""))
+           (lambda () (top-interp '(+ 4 (error "1234")))))
+
+(check-exn (regexp (regexp-quote "parse: OAZO: Invalid Ids (:)"))
+           (lambda ()  (parse '(let (: <- "") "World"))))
 
 ; -- OAZO6 program --
 ;()
