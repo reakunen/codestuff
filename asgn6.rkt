@@ -129,7 +129,7 @@
     ['read-num (printf ">") (let ([input (read)])
                (cond
                  [(real? input) (NumV input)]
-                 [else (error 'eval-prim "OAZO: Input NaN ~a" input)]))]
+                 [else (NumV -1)]))]
     ['++ (StrV (string-append* (map (λ ([val : ValV])  (coerceString val)) vals)))]
     ['seq (last vals)]
     [(or '<= 'equal? '+ '- '* '/)
@@ -360,4 +360,33 @@
            (lambda ()  (parse '(let (: <- "") "World"))))
 
 ; -- OAZO6 program --
-;()
+; Gives the player 5 guesses, allows player to keep playing if the player does not guess the correct
+; CSC course number. 
+#;(top-interp '{let {target <- 430}
+               {seq
+                {println "Let's play a guessing game! Guess the course number of the best CSC course!"}
+                {let {game <- {anon {guesses game2} :
+                                    {if {<= 5 guesses}
+                                        then
+                                        {seq
+                                         {println "Would you like to play again? [1 For Yes] [0 For No]"}
+                                         {let {playAgain <- {read-num}}
+                                           {if {equal? playAgain 0}
+                                               then {println "Thank you for playing!"}
+                                               else {seq
+                                                     {println "Playing again!"}
+                                                     {game2 0 game2}}
+                                               }}
+                                         }
+                                        else
+                                        {let {guess <- {read-num}}
+                                          {if {equal? guess target}
+                                              then {println {++ "You got it right " target}}
+                                              else
+                                              {seq
+                                               {println {++ "Wrong answer, " {- 4 guesses} " guesses remaining!"}}
+                                               {game2 {+ guesses 1 } game2}}
+                                              }}
+                                        }}}
+                  {game 0 game}}
+}}) 
