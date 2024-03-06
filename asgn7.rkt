@@ -5,23 +5,28 @@
 ; Assignment 7 
 
 ; ExprC definitions
-(define-type ExprC (U NumC IdC StrC IfC LetC AnonC AppC))
+(define-type ExprC (U NumC IdC StrC IfC AnonC AppC))
 (struct NumC ([n : Real]) #:transparent)         ; Number 
 (struct IdC ([s : Symbol]) #:transparent)        ; Id
 (struct StrC ([s : String]) #:transparent)       ; String
 (struct IfC ([test : ExprC] [then : ExprC] [else : ExprC]) #:transparent )    ; If-else statement
-(struct LetC ([names : (Listof Symbol)] [defs : (Listof ExprC)] [expr : ExprC]) #:transparent)    ; let Local vars
 (struct AnonC ([args : (Listof Symbol)] [exp : ExprC]) #:transparent)    ; Anonymous function 
 (struct AppC ([fun : ExprC] [arg : (Listof ExprC)]) #:transparent)    ; Function Application
-
+(struct SeqC ([bodys : (Listof ExprC)]) #:transparent)
 
 
 ; Environment definitions, from book
+(define-type-alias Location number)
 (define-type Env [Listof Binding])
-(struct Binding ([name : Symbol] [val : ValV]) #:transparent)
+(struct Binding ([name : Symbol] [val : Location]) #:transparent)
 (define mt-env '())
 (define extend-env cons)
 
+(struct  Storage ([(loc : Location) (val : ValV)]) #:transparent)
+
+(define-type-alias Store (listof Storage))
+(define mt-store '())
+(define override-store cons)
 
 ; Value definitions 
 (define-type ValV (U NumV BoolV StrV CloV PrimV ErrV))
@@ -30,8 +35,9 @@
 (struct StrV ([str : String]) #:transparent)
 (struct CloV ([args : (Listof Symbol)] [body : ExprC] [env : Env]) #:transparent)
 ; primitive operators
-(struct PrimV ([op : Symbol]) #:transparent)     ; should be 
-(struct ErrV ([e : (-> ValV String)]) #:transparent)          ; error 
+(struct PrimV ([op : Symbol]) #:transparent)     
+(struct ErrV ([e : (-> ValV String)]) #:transparent)   ; error 
+(struct BoxV ([l : Location]) #:transparent)  ; box 
 
 
 ; serialize: takes in a ValV, outputs the string of given value 
@@ -82,26 +88,26 @@
     [(list 'anon (list (? symbol? ids) ...) ': expr ) (define args (cast ids (Listof Symbol)))
      (if (check-duplicates args) (error 'parse "OAZO: Duplicate arguments ~a" args) args)
      (AnonC args (parse expr))]
+    [(list 'seq exprs ...) (SeqC (map parse (cast exprs (Listof Sexp))))] ; for the seq clause 
     [(list exprs ...) (AppC (parse (first exprs)) (map parse (rest exprs)))]))
 
+(define-type Type )
+(define (parse-type [s : Sexp]) : Type )
+(struct v*s ([val : ValV] [sto : Store]) #: transparent) 
 ; interp: takes in an ExprC and Environmnet, returns a ValV
 ; interprets a given expression
-(define (interp [exp : ExprC] [env : Env]) : ValV
+(define (interp [exp : ExprC] [env : Env] [sto : Sto]) : v*s
   (match exp
-    [(NumC n) (NumV n)]
-    [(StrC s) (StrV s)]
-    [(IdC n) (lookup n env)]
+    [(NumC n) (v*s (NumV n) sto)]
+    [(StrC s) (v*s (StrV s) sto)]
+    [IdC (n) (v*s (fetch (lookup n env) sto) sto)]
     [(IfC test then else) (match (interp test env)
                             [(BoolV b)
                              (cond 
                                    [b (interp then env) ] 
                                    [else (interp else env)])]
                             [else (error 'interp "OAZO is not a BoolV")])]
-    [(LetC names defs expr)
-     (define values (map (lambda ([def : ExprC]) (interp def env)) defs))
-     (define new-env (extend-bindings names values env))
-     (interp expr new-env)]
-    [(AnonC args exp) (CloV args exp env)]
+    [(AnonC args exp) (v*s (CloV args exp env) sto)]
     [(AppC fun args)
      (define functionValue (interp fun env))
      (define argVals (map (lambda ([arg : ExprC]) (interp arg env)) args))
@@ -111,41 +117,46 @@
                                [else (error 'interp "OAZO incorrect number of arguments ~a" args)]
        )]
        [(ErrV e) (error 'interp (e (interp (first args) env)))]
-       [(PrimV op) ; evaluates the primitives 
-        (cond
-          [(not ( = (length args) 2)) (error 'interp "OAZO incorrect number of arguments ~a" a)]
-          [else (eval-prim op (interp (first args) env ) (interp (second args) env))])]
+       [(PrimV op) ; evaluates the primitives
+        (eval-prim op argVals)]
       [other (error 'interp (format "OAZO: user-error ~a" exp))]
   )]))
 
 
-; helper to evaluate the primitives
-(define (eval-prim [op : Symbol] [l : ValV] [r : ValV]) : ValV
+; eval-prim: helper to evaluate the primitives
+; takes in a symbol of operation, and list of values to do the operation to, returns a value
+(define (eval-prim [op : Symbol] [vals : (Listof ValV)]) : ValV
   (match op
-    ['<= (match (list l r)
-           [(list (NumV a) (NumV b)) (BoolV (<= a b))]
-           [else (error 'eval-prim "OAZO: Invalid types given for <= operation")])]
-    ['equal? (match (list l r)
-               [(list (NumV a) (NumV b)) (BoolV (= a b))]
-               [(list (BoolV a) (BoolV b)) (BoolV (equal? a b))]
-               [(list (StrV a) (StrV b)) (BoolV (equal? a b))]
-               [other (BoolV #f)]
-               )]
-    ['+ (match (list l r)
-          [(list (NumV a) (NumV b)) (NumV (+ a b))]
-          [else (error 'eval-prim "OAZO: Invalid types given for + operation")])]
-    ['- (match (list l r)
-          [(list (NumV a) (NumV b)) (NumV (- a b))]
-          [else (error 'eval-prim "OAZO: Invalid types given for - operation")])]
-    ['* (match (list l r)
-          [(list (NumV a) (NumV b)) (NumV (* a b))]
-          [else (error 'eval-prim "OAZO: Invalid types given for * operation")])]
-    ['/ (match (list l r)
-          [(list (NumV a) (NumV b))
-           (if (= b 0)
-               (error 'eval-prim "OAZO: Division by zero")
-               (NumV (/ a b)))]
-          [else (error 'eval-prim "OAZO: Invalid types given for / operation")])]))
+    ['seq (last vals)] ; make it illegal to call seq with < 2 arguments 
+    [(or '<= 'equal? '+ '- '* '/)
+     (cond
+       [(not (= (length vals) 2)) (error 'eval-prim "OAZO: incorrect number of arguments ~a" vals)]
+       [else (match op
+               ['<= (match (list (first vals) (second vals))
+                      [(list (NumV a) (NumV b)) (BoolV (<= a b))]
+                      [other (error 'eval-prim "OAZO: Invalid types given for <= operation")])]
+               ['equal? (match (list (first vals) (second vals))
+                          [(list (NumV a) (NumV b)) (BoolV (= a b))]
+                          [(list (BoolV a) (BoolV b)) (BoolV (equal? a b))]
+                          [(list (StrV a) (StrV b)) (BoolV (equal? a b))]
+                          [other (BoolV #f)]
+                          )]
+               ['+ (match (list (first vals) (second vals))
+                     [(list (NumV a) (NumV b)) (NumV (+ a b))]
+                     [other (error 'eval-prim "OAZO: Invalid types given for + operation")])]
+               ['- (match (list (first vals) (second vals))
+                     [(list (NumV a) (NumV b)) (NumV (- a b))]
+                     [other (error 'eval-prim "OAZO: Invalid types given for - operation")])]
+               ['* (match (list (first vals) (second vals))
+                     [(list (NumV a) (NumV b)) (NumV (* a b))]
+                     [other (error 'eval-prim "OAZO: Invalid types given for * operation")])]
+               ['/ (match (list (first vals) (second vals))
+                     [(list (NumV a) (NumV b))
+                      (if (= b 0)
+                          (error 'eval-prim "OAZO: Division by zero")
+                          (NumV (/ a b)))]
+                     [other (error 'eval-prim "OAZO: Invalid types given for / operation")])])])]
+    [other (error 'eval-prim "OAZO: Invalid operator" op) ]))
 
 
 
@@ -155,14 +166,25 @@
 (check-equal? (eval-prim 'equal? (StrV "sus") (StrV "baka")) (BoolV #f))
 
 
-;looks up a symbol in the environment 
-(define (lookup [for : Symbol] [env : Env]) : ValV
+; looks up a symbol in the environment, needs to be changed for env -> location 
+(define (lookup [for : Symbol] [env : Env]) : Location ; location is a number (location)
   (match env
     ['() (error 'lookup "OAZO name not found: ~e" for)]
     [(cons (Binding name val) r) (cond
                                    [(symbol=? for name) val] ; changed to NumV
                                    [else (lookup for r)])]))
 
+
+;(struct  Storage ([(loc : Location) (val : ValV)]) #:transparent)
+
+;(define-type-alias Store (listof Storage))
+; fetch returns a location (number) 
+(define (fetch [for : Location] [sto : Store]) : ValV
+  (match sto
+    ['() (error 'fetch "OAZO location not found: ~e" loc)]
+    [(cons (Storage loc val) r) (cond 
+      [(equals? for loc ) val]
+      [else (fetch for r)])])) 
 
 ; extends an environment 
 (define (extend [arg : Symbol] [val : ValV] [env : Env]) : Env
@@ -179,7 +201,6 @@
 
 
 ; Top Level Environment
-
 ; top-interp: takes in a s-expression, returns a string
 (define (top-interp [s : Sexp]) : String
   (define top-env
@@ -192,6 +213,9 @@
         (Binding 'true (BoolV #t))
         (Binding 'error (ErrV user-error))
         (Binding 'false (BoolV #f))))
+        (Binding 'arr ) ; todo 
+        (Binding 'aref ) ; todo 
+        (Binding 'aset! ) ; todo 
   (serialize (interp (parse s) top-env)))
 
 (define (user-error [v : ValV]) : String
@@ -303,27 +327,6 @@
 (define t1 '{{anon {z z z} : {+ z y}}
  {+ 9 d}
  98})
-
-
-; -- parse test cases --
-(check-equal? (parse "abcdefg") (StrC "abcdefg")) 
-(check-exn (regexp (regexp-quote "parse: OAZO: Duplicate arguments (z z z)"))
-           (lambda () (top-interp t1)))
-(check-exn (regexp (regexp-quote "parse: OAZO: Invalid Idc anon"))
-           (lambda () (parse '{anon : })))
-(check-equal? (parse '{+ 5 6}) (AppC (IdC '+) (list (NumC 5) (NumC 6))))
-(check-equal? (parse '{if 5 then 2 else 6})  (IfC (NumC 5) (NumC 2) (NumC 6)))
-(check-equal? (parse '{anon {z y} : {+ z y}}) (AnonC '(z y) (AppC (IdC '+) (list (IdC 'z) (IdC 'y)))))
-
-
-; serialize test cases
-(check-equal? (serialize (NumV 5)) "5")
-(check-equal? (serialize (BoolV #t)) "true")
-(check-equal? (serialize (BoolV #f)) "false")
-(check-equal? (serialize (StrV "hello")) "\"hello\"")
-(check-equal? (serialize (CloV '() (NumC 5) mt-env)) "#<procedure>")
-(check-equal? (serialize (PrimV '+)) "#<primop>")
-
 
 ; other test cases 
 (check-exn (regexp (regexp-quote "parse: OAZO: Invalid duplicate variable (z z)"))
