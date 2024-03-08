@@ -206,10 +206,9 @@
 ; set index should add a new binding with the same location 
 ; sets the location in storage to a new value 
 (define (aset-arr [arr : ArrV] [idx : Real] [newval : ValV] [sto : Store]) : v*s
-  (if (<= (ArrV-size arr) idx)
-      (error 'aset "Index out of bounds"))
-      (define sto2 (cons (Store idx newval) sto))
-      (v*s (NullV) sto2))
+  (cond 
+      [(<= (ArrV-size arr) idx) (error 'aset "Index out of bounds")]
+      [else(define sto2 (cons (Storage idx newval) sto)) (v*s (NullV) sto2)]))
 
 ; eval-prim: helper to evaluate the primitives
 ; takes in a symbol of operation, and list of values to do the operation to, returns a value
@@ -220,8 +219,7 @@
              (let-values ([(loc new-store) (allocate-helper sto size (NumV default))])
                (v*s (ArrV (NumV loc) (NumV size)) new-store))])]
     ['aref (match vals 
-            [(list (ArrV loc size) (NumV idx))
-              (if (<= size idx) (error 'aref "Index out of bounds"))              
+            [(list (ArrV loc size) (NumV idx))        
               (define idx-loc (+ loc idx)) 
               (v*s (get-index idx-loc sto) sto)])] ; make a new binding 
     ['aset (aset-arr (first vals) (second vals) (third vals))] ;(match vals 
@@ -230,8 +228,8 @@
             [(list (ArrV loc size)) (v*s (NumV size) sto)])]
     ['substring (match vals 
                   [(list (StrV str) (NumV start) (NumV end)) 
-                  (define sub (substring str start end)
-                  (v*s (StrV sub) sto))])]
+                  (define sub (substring str start end))
+                  (v*s (StrV sub) sto)])]
     [(or '<= 'equal? '+ '- '* '/)
      (cond
        [(not (= (length vals) 2)) (error 'eval-prim "OAZO: incorrect number of arguments ~a" vals)]
@@ -277,9 +275,9 @@
 ; Fetch, Maps Location to Store 
 (define (fetch [for : Real] [sto : Store]) : ValV
   (match sto
-    ['() (error 'fetch "OAZO location not found: ~e" loc)]
+    ['() (error 'fetch "OAZO location not found: ~e" for)]
     [(cons (Storage loc val) r) (cond 
-      [(equals? for loc ) val]
+      [(= for loc ) val]
       [else (fetch for r)])])) 
 
 ; extends an environment 
