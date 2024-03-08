@@ -5,7 +5,7 @@
 ; Assignment 7 
 
 ; ExprC definitions
-(define-type ExprC (U NumC IdC StrC IfC AnonC AppC))
+(define-type ExprC (U NumC IdC StrC IfC AnonC AppC SeqC AssignC))
 (struct NumC ([n : Real]) #:transparent)         ; Number 
 (struct IdC ([s : Symbol]) #:transparent)        ; Id
 (struct StrC ([s : String]) #:transparent)       ; String
@@ -130,7 +130,7 @@
     [(list 'anon (list (? symbol? ids) ...) ': expr ) (define args (cast ids (Listof Symbol)))
      (if (check-duplicates args) (error 'parse "OAZO: Duplicate arguments ~a" args) args)
      (AnonC args (parse expr))]
-    [(list 'seq exprs ...) (SeqC (map parse exprs))] ; for the seq clause 
+    [(list 'seq body ...) (SeqC (map parse body))] ; for the seq clause 
     [(list exprs ...) (AppC (parse (first exprs)) (map parse (rest exprs)))]))
 
 ; assign helper 
@@ -139,7 +139,7 @@
 
 ; interp: takes in an ExprC and Environmnet, returns a ValV
 ; interprets a given expression
-(define (interp [exp : ExprC] [env : Env] [sto : Sto]) : v*s
+(define (interp [exp : ExprC] [env : Env] [sto : Store]) : v*s
   (match exp
     [(NumC n) (v*s (NumV n) sto)]
     [(StrC s) (v*s (StrV s) sto)]
